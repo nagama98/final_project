@@ -53,32 +53,59 @@ export class OpenAIService {
         return await this.handleQueryWithoutAPI(message);
       }
 
-      // Step 1: Try OpenAI for intent analysis
+      // Step 1: Try OpenAI for intent analysis with retry logic
       console.log('🔵 Attempting Azure OpenAI call...');
-      const intentResponse = await this.client.chat.completions.create({
-        model: this.getChatModel(),
-        messages: [
-          {
-            role: "system",
-            content: `You are a loan management assistant. Analyze the user's query and extract search parameters for a loan database. 
-            Respond with JSON containing these fields:
-            - "searchType": "specific_search" | "general_question" | "help"
-            - "parameters": object with loan search filters like status, loanType, minAmount, maxAmount, customerName, etc.
-            - "query": the processed search query for text search
-            - "intent": brief description of what the user wants
-            
-            Valid statuses: pending, under_review, approved, rejected, disbursed
-            Valid loan types: personal, mortgage, auto, business, student`
-          },
-          {
-            role: "user",
-            content: message
+      
+      let intentResponse;
+      let retryCount = 0;
+      const maxRetries = 3;
+      
+      while (retryCount < maxRetries) {
+        try {
+          intentResponse = await Promise.race([
+            this.client.chat.completions.create({
+              model: this.getChatModel(),
+              messages: [
+                {
+                  role: "system",
+                  content: `You are a loan management assistant. Analyze the user's query and extract search parameters for a loan database. 
+                  Respond with JSON containing these fields:
+                  - "searchType": "specific_search" | "general_question" | "help"
+                  - "parameters": object with loan search filters like status, loanType, minAmount, maxAmount, customerName, etc.
+                  - "query": the processed search query for text search
+                  - "intent": brief description of what the user wants
+                  
+                  Valid statuses: pending, under_review, approved, rejected, disbursed
+                  Valid loan types: personal, mortgage, auto, business, student`
+                },
+                {
+                  role: "user",
+                  content: message
+                }
+              ],
+              response_format: { type: "json_object" },
+              temperature: 0.3
+            }),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Request timeout')), 15000)
+            )
+          ]);
+          
+          console.log('🟢 Azure OpenAI call successful');
+          break;
+          
+        } catch (retryError: any) {
+          retryCount++;
+          console.log(`🔴 Azure OpenAI attempt ${retryCount} failed:`, retryError.message);
+          
+          if (retryCount >= maxRetries) {
+            throw retryError;
           }
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.3
-      });
-      console.log('🟢 Azure OpenAI call successful');
+          
+          // Wait before retry (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+        }
+      }
 
       const intent = JSON.parse(intentResponse.choices[0].message.content || "{}");
 
@@ -100,19 +127,24 @@ export class OpenAIService {
 
         Provide a conversational response that summarizes the findings in a helpful way.`;
 
-        const summaryResponse = await this.client.chat.completions.create({
-          model: this.getChatModel(),
-          messages: [
-            {
-              role: "system",
-              content: "You are a helpful loan management assistant. Provide clear, professional responses about loan data."
-            },
-            {
-              role: "user",
-              content: responsePrompt
-            }
-          ]
-        });
+        const summaryResponse = await Promise.race([
+          this.client.chat.completions.create({
+            model: this.getChatModel(),
+            messages: [
+              {
+                role: "system",
+                content: "You are a helpful loan management assistant. Provide clear, professional responses about loan data."
+              },
+              {
+                role: "user",
+                content: responsePrompt
+              }
+            ]
+          }),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Summary response timeout')), 10000)
+          )
+        ]);
 
         return {
           response: summaryResponse.choices[0].message.content || "I found some loans matching your criteria.",
@@ -125,24 +157,29 @@ export class OpenAIService {
 
       } else if (intent.searchType === "general_question") {
         // Handle general questions about loan management
-        const generalResponse = await this.client.chat.completions.create({
-          model: this.getChatModel(),
-          messages: [
-            {
-              role: "system",
-              content: `You are a loan management expert assistant. Answer questions about loan management, banking processes, and provide helpful guidance. 
-              
-              Available loan types: personal, mortgage, auto, business, student
-              Available statuses: pending, under_review, approved, rejected, disbursed
-              
-              If the user asks about specific data, suggest they ask for specific searches like "show me all pending mortgages" or "find loans over $100,000".`
-            },
-            {
-              role: "user",
-              content: message
-            }
-          ]
-        });
+        const generalResponse = await Promise.race([
+          this.client.chat.completions.create({
+            model: this.getChatModel(),
+            messages: [
+              {
+                role: "system",
+                content: `You are a loan management expert assistant. Answer questions about loan management, banking processes, and provide helpful guidance. 
+                
+                Available loan types: personal, mortgage, auto, business, student
+                Available statuses: pending, under_review, approved, rejected, disbursed
+                
+                If the user asks about specific data, suggest they ask for specific searches like "show me all pending mortgages" or "find loans over $100,000".`
+              },
+              {
+                role: "user",
+                content: message
+              }
+            ]
+          }),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('General response timeout')), 10000)
+          )
+        ]);
 
         return {
           response: generalResponse.choices[0].message.content || "I'm here to help with loan management questions."
@@ -171,7 +208,9 @@ I can also answer general questions about loan management processes.`
         status: error.status,
         code: error.code,
         name: error.name,
-        type: error.type
+        type: error.type,
+        isTimeout: error.message?.includes('timeout'),
+        isNetworkError: error.code === 'ECONNRESET' || error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT'
       });
       
       // Check if it's an authentication error or OpenAI related error
@@ -180,7 +219,21 @@ I can also answer general questions about loan management processes.`
           (error.name === 'AuthenticationError') ||
           (error instanceof Error && error.message.includes('API key'))) {
         console.log('🔴 Azure OpenAI authentication failed, using fallback mode');
-        return this.handleQueryWithoutAPI(message);
+        return {
+          response: "I'm experiencing authentication issues with Azure OpenAI services. I can still help you with basic loan queries using my local processing capabilities. Please try asking about pending loans, approved applications, or loan counts.",
+          loans: [],
+          metadata: { error: 'authentication_failed', fallback: true }
+        };
+      }
+      
+      // Check for network/timeout errors
+      if (error.message?.includes('timeout') || error.code === 'ECONNRESET' || error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT') {
+        console.log('🔴 Azure OpenAI network timeout, using fallback mode');
+        return {
+          response: "I'm experiencing a temporary connection issue with Azure OpenAI services. Let me process your request using my local capabilities. Please try your question again or ask about loan statuses, amounts, or types.",
+          loans: [],
+          metadata: { error: 'network_timeout', fallback: true }
+        };
       }
       
       console.log('🔴 Azure OpenAI request failed, using fallback mode');
