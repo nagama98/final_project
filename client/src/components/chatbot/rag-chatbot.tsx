@@ -20,7 +20,7 @@ export default function RAGChatbot() {
     {
       id: '1',
       type: 'assistant',
-      content: "Hello! I'm your AI loan assistant. I can help you with:\n• Loan application status\n• Document requirements\n• Interest rate information\n• Risk assessment queries",
+      content: "Hello! I'm your AI loan assistant powered by Elasticsearch and OpenAI. I can help you with:\n• Search loan applications by status, type, or amount\n• Find specific customer loans\n• Get loan statistics and counts\n• Analyze loan portfolios\n• Answer questions about loan documents\n\nTry asking: 'Show me all pending loans' or 'Find loans above $50,000'",
       timestamp: new Date()
     }
   ]);
@@ -38,15 +38,16 @@ export default function RAGChatbot() {
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         type: 'assistant',
-        content: data.response,
+        content: data.response || "I received your message but couldn't generate a response. Please try again.",
         timestamp: new Date()
       }]);
     },
     onError: (error) => {
+      console.error('Chat error:', error);
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         type: 'assistant',
-        content: "I'm currently having connection issues. The application works fine, but AI features may be limited until external services are configured.",
+        content: "I'm having trouble connecting to the AI service. The system is still working, but I can't process your request right now. Please check that your API keys are configured correctly.",
         timestamp: new Date()
       }]);
     }

@@ -115,25 +115,88 @@ export class ElasticsearchService {
 
   async hybridSearch(indexName: string, searchQuery: string, filters: any = {}): Promise<any> {
     try {
+      // Use RRF (Reciprocal Rank Fusion) pattern for better search results
       const query = {
+        retriever: {
+          rrf: {
+            retrievers: [
+              {
+                standard: {
+                  query: {
+                    multi_match: {
+                      query: searchQuery,
+                      fields: ['applicationId^2', 'customerName^2', 'loanType', 'status', 'customerEmail'],
+                      boost: 1.5
+                    }
+                  }
+                }
+              },
+              {
+                standard: {
+                  query: {
+                    multi_match: {
+                      query: searchQuery,
+                      fields: ['customerName', 'loanType'],
+                      fuzziness: 'AUTO',
+                      boost: 0.8
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        highlight: {
+          fields: {
+            customerName: {
+              type: "unified",
+              number_of_fragments: 2,
+              order: "score"
+            },
+            loanType: {
+              type: "unified",
+              number_of_fragments: 2,
+              order: "score"
+            },
+            status: {
+              type: "unified",
+              number_of_fragments: 2,
+              order: "score"
+            }
+          }
+        },
+        size: 10
+      };
+
+      // Add filters if provided
+      if (Object.keys(filters).length > 0) {
+        query.retriever.rrf.retrievers.forEach(retriever => {
+          if (!retriever.standard.query.bool) {
+            retriever.standard.query = {
+              bool: {
+                must: [retriever.standard.query],
+                filter: Object.entries(filters).map(([key, value]) => ({
+                  term: { [key]: value }
+                }))
+              }
+            };
+          }
+        });
+      }
+
+      return this.search(indexName, query);
+    } catch (error) {
+      console.error('Hybrid search failed, falling back to basic search:', error);
+      // Fallback to basic search if RRF is not available
+      const fallbackQuery = {
         query: {
           bool: {
             should: [
-              // Keyword search
               {
                 multi_match: {
                   query: searchQuery,
                   fields: ['applicationId^2', 'customerName^2', 'loanType', 'status', 'customerEmail'],
                   boost: 1.5
-                }
-              },
-              // Fuzzy search for typos
-              {
-                multi_match: {
-                  query: searchQuery,
-                  fields: ['customerName', 'loanType'],
-                  fuzziness: 'AUTO',
-                  boost: 0.8
                 }
               }
             ],
@@ -144,18 +207,15 @@ export class ElasticsearchService {
             ] : []
           }
         },
-        sort: [
-          { _score: { order: 'desc' } },
-          { createdAt: { order: 'desc' } }
-        ],
-        size: 100 // Limit results
+        size: 10
       };
-
-      return this.search(indexName, query);
-    } catch (error) {
-      console.error('Hybrid search failed:', error);
-      // Return empty result if ES is not available
-      return { hits: { hits: [], total: { value: 0 } } };
+      
+      try {
+        return this.search(indexName, fallbackQuery);
+      } catch (fallbackError) {
+        console.error('Fallback search also failed:', fallbackError);
+        return { hits: { hits: [], total: { value: 0 } } };
+      }
     }
   }
 

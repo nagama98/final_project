@@ -174,10 +174,22 @@ export class RAGService {
 
   async searchLoanApplications(query: string, filters: any = {}, limit: number = 10): Promise<any[]> {
     try {
-      // Use smart query processing for natural language
+      // First try Elasticsearch with RRF pattern
+      const esResults = await elasticsearch.hybridSearch('loan_applications', query, filters);
+      
+      if (esResults.hits?.hits?.length > 0) {
+        return esResults.hits.hits.slice(0, limit).map((hit: any) => ({
+          id: hit._id,
+          source: hit._source,
+          score: hit._score || 1.0,
+          highlight: hit.highlight
+        }));
+      }
+      
+      // Fall back to smart query processing
       return await this.processSmartQuery(query);
     } catch (error) {
-      console.warn('Smart query processing failed, falling back to basic search');
+      console.warn('Elasticsearch search failed, falling back to storage search');
       return await this.searchApplicationsFromStorage(query, filters, limit);
     }
   }
@@ -230,9 +242,9 @@ export class RAGService {
       // Parse the query to understand intent
       const { intent, filters, parameters } = this.parseNaturalLanguageQuery(userQuery);
       
-      // Get smart results based on query
-      const relevantLoans = await this.processSmartQuery(userQuery);
-      const relevantDocs = await this.searchRelevantDocuments(userQuery, 2);
+      // Get smart results based on query using improved Elasticsearch search
+      const relevantLoans = await this.searchLoanApplications(userQuery, filters, 10);
+      const relevantDocs = await this.searchRelevantDocuments(userQuery, 3);
 
       // Generate contextual response based on intent and results
       const response = await this.generateContextualResponse(userQuery, intent, relevantLoans, relevantDocs, parameters);
@@ -243,8 +255,10 @@ export class RAGService {
       };
     } catch (error) {
       console.error('Failed to generate RAG response:', error);
+      // Enhanced fallback with better error handling
+      const fallbackResponse = this.generateFallbackResponse(userQuery);
       return {
-        response: this.generateFallbackResponse(userQuery),
+        response: fallbackResponse,
         context: []
       };
     }
