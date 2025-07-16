@@ -68,11 +68,21 @@ export class OpenAIService {
               messages: [
                 {
                   role: "system",
-                  content: `You are a loan management assistant. Analyze the user's query and extract search parameters for a loan database. 
-                  Respond with JSON containing these fields:
-                  - "searchType": "specific_search" | "general_question" | "help"
+                  content: `You are an intelligent assistant for a loan management system called ElastiBank. You can handle both loan-specific queries and general questions. 
+                  
+                  Analyze the user's query and respond with JSON containing these fields:
+                  - "searchType": "loan_search" | "general_question" | "help" | "explanation" | "greeting" | "system_info"
                   - "parameters": object with loan search filters like status, loanType, minAmount, maxAmount, customerName, etc.
                   - "query": the processed search query for text search
+                  - "intent": brief description of what the user wants
+                  
+                  Categories:
+                  - "loan_search": User wants to find specific loans or loan data
+                  - "general_question": User asks about loan management processes, definitions, or general banking topics
+                  - "explanation": User wants explanations about how something works
+                  - "greeting": User is greeting or testing the system
+                  - "help": User needs help or wants to know what they can ask
+                  - "system_info": User asks about the system capabilities or technical details
                   - "intent": brief description of what the user wants
                   
                   Valid statuses: pending, under_review, approved, rejected, disbursed
@@ -109,7 +119,7 @@ export class OpenAIService {
 
       const intent = JSON.parse(intentResponse.choices[0].message.content || "{}");
 
-      if (intent.searchType === "specific_search") {
+      if (intent.searchType === "loan_search") {
         // Step 2: Search for loans based on extracted parameters
         const loans = await this.searchLoansFromStorage(intent.parameters);
 
@@ -182,7 +192,117 @@ export class OpenAIService {
         ]);
 
         return {
-          response: generalResponse.choices[0].message.content || "I'm here to help with loan management questions."
+          response: generalResponse.choices[0].message.content || "I'm here to help with loan management questions.",
+          loans: [],
+          metadata: { intent: intent.intent || 'General question' }
+        };
+
+      } else if (intent.searchType === "explanation") {
+        // Handle explanations about how things work
+        const explanationResponse = await Promise.race([
+          this.client.chat.completions.create({
+            model: this.getChatModel(),
+            messages: [
+              {
+                role: "system",
+                content: `You are an expert explaining loan management and banking concepts. Provide clear, detailed explanations that help users understand complex topics. Use examples when helpful and be comprehensive yet accessible.`
+              },
+              {
+                role: "user",
+                content: message
+              }
+            ]
+          }),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Explanation response timeout')), 10000)
+          )
+        ]);
+
+        return {
+          response: explanationResponse.choices[0].message.content || "I can explain loan management concepts and processes.",
+          loans: [],
+          metadata: { intent: intent.intent || 'Explanation request' }
+        };
+
+      } else if (intent.searchType === "greeting") {
+        // Handle greetings and casual interactions
+        const greetingResponse = await Promise.race([
+          this.client.chat.completions.create({
+            model: this.getChatModel(),
+            messages: [
+              {
+                role: "system",
+                content: `You are a friendly, professional loan management assistant. Respond to greetings warmly and briefly introduce your capabilities. Keep responses concise but helpful.`
+              },
+              {
+                role: "user",
+                content: message
+              }
+            ]
+          }),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Greeting response timeout')), 10000)
+          )
+        ]);
+
+        return {
+          response: greetingResponse.choices[0].message.content || "Hello! I'm your AI loan assistant. How can I help you today?",
+          loans: [],
+          metadata: { intent: intent.intent || 'Greeting' }
+        };
+
+      } else if (intent.searchType === "system_info") {
+        // Handle system information requests
+        const systemResponse = await Promise.race([
+          this.client.chat.completions.create({
+            model: this.getChatModel(),
+            messages: [
+              {
+                role: "system",
+                content: `You are explaining the ElastiBank loan management system. Describe its capabilities including loan processing, document management, AI-powered search with Elasticsearch, Azure OpenAI integration, and analytics features. Be informative and professional.`
+              },
+              {
+                role: "user",
+                content: message
+              }
+            ]
+          }),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('System info response timeout')), 10000)
+          )
+        ]);
+
+        return {
+          response: systemResponse.choices[0].message.content || "ElastiBank is a comprehensive loan management system with AI-powered features.",
+          loans: [],
+          metadata: { intent: intent.intent || 'System information' }
+        };
+
+      } else if (intent.searchType === "help") {
+        // Handle help requests
+        const helpResponse = await Promise.race([
+          this.client.chat.completions.create({
+            model: this.getChatModel(),
+            messages: [
+              {
+                role: "system",
+                content: `You are providing help for a loan management system. Explain comprehensively what you can do, including loan searches, general questions, explanations, and system guidance. Provide specific examples.`
+              },
+              {
+                role: "user",
+                content: message
+              }
+            ]
+          }),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Help response timeout')), 10000)
+          )
+        ]);
+
+        return {
+          response: helpResponse.choices[0].message.content || "I can help with loan searches, general questions, and explanations about loan management.",
+          loans: [],
+          metadata: { intent: intent.intent || 'Help request' }
         };
 
       } else {

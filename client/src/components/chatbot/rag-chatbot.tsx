@@ -20,7 +20,7 @@ export default function RAGChatbot() {
     {
       id: '1',
       type: 'assistant',
-      content: "Hello! I'm your AI loan assistant powered by Elasticsearch and Azure OpenAI. I can help you with:\n• Search loan applications by status, type, or amount\n• Find specific customer loans\n• Get loan statistics and counts\n• Analyze loan portfolios\n• Answer questions about loan documents\n\nTry asking: 'Show me all pending loans' or 'Find loans above $50,000'",
+      content: "Hello! I'm your AI assistant powered by Elasticsearch and Azure OpenAI. I can help you with:\n\n**Loan Searches:**\n• Search applications by status, type, or amount\n• Find specific customer loans\n• Get loan statistics and counts\n• Analyze loan portfolios\n\n**General Questions:**\n• Explain loan management processes\n• Answer banking and finance questions\n• Provide system information\n• Help with loan terminology\n\n**Examples:**\n• 'Show me all pending loans'\n• 'What is a mortgage loan?'\n• 'How does loan approval work?'\n• 'Explain risk scoring'",
       timestamp: new Date()
     }
   ]);
