@@ -13,11 +13,11 @@ export class OpenAIService {
       console.log(`   Deployment: ${process.env.AZURE_OPENAI_DEPLOYMENT_NAME}`);
       
       this.client = new OpenAI({
-        apiKey: process.env.AZURE_OPENAI_API_KEY,
-        baseURL: `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${process.env.AZURE_OPENAI_DEPLOYMENT_NAME}`,
-        defaultQuery: { 'api-version': '2024-06-01' },
+        apiKey: process.env.AZURE_OPENAI_API_KEY || "1IMfC4yz9JrWlrMSoJ8ROK8gsY24zjTpoZe0irVMAQTzkarSuEBFJQQJ99BGACYeBjFXJ3w3AAABACOGnL14",
+        baseURL: "https://openaikeyelastic.openai.azure.com/openai/deployments/gpt-4o",
+        defaultQuery: { 'api-version': '2025-01-01-preview' },
         defaultHeaders: {
-          'api-key': process.env.AZURE_OPENAI_API_KEY,
+          'api-key': process.env.AZURE_OPENAI_API_KEY || "1IMfC4yz9JrWlrMSoJ8ROK8gsY24zjTpoZe0irVMAQTzkarSuEBFJQQJ99BGACYeBjFXJ3w3AAABACOGnL14",
         },
       });
     } else {

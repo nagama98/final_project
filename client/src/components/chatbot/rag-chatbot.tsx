@@ -28,11 +28,22 @@ export default function RAGChatbot() {
 
   const chatMutation = useMutation({
     mutationFn: async (message: string) => {
-      const response = await apiRequest('POST', '/api/chat', {
-        message,
-        userId: 1 // TODO: Get actual user ID
-      });
-      return response.json();
+      try {
+        console.log('Sending chat message:', message);
+        const response = await apiRequest('/api/chat', {
+          method: 'POST',
+          body: JSON.stringify({
+            message,
+            userId: 1 // TODO: Get actual user ID
+          })
+        });
+        
+        console.log('Chat response received:', response);
+        return await response.json();
+      } catch (error: any) {
+        console.error('Chat API error:', error);
+        throw error;
+      }
     },
     onSuccess: (data) => {
       setMessages(prev => [...prev, {
@@ -42,12 +53,24 @@ export default function RAGChatbot() {
         timestamp: new Date()
       }]);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Chat error:', error);
+      
+      // Get more specific error information
+      let errorMessage = "I'm experiencing an issue processing your request. Please try again.";
+      
+      if (error.message) {
+        errorMessage = `Error: ${error.message}`;
+      } else if (error.status) {
+        errorMessage = `Server error (${error.status}). Please try your question again.`;
+      } else if (error.name === 'TypeError' && error.message?.includes('fetch')) {
+        errorMessage = "Network connection issue. Please check your connection and try again.";
+      }
+      
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         type: 'assistant',
-        content: "I'm experiencing a temporary connection issue. Azure OpenAI services are configured but the request failed. Please try your question again.",
+        content: errorMessage,
         timestamp: new Date()
       }]);
     }
