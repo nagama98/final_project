@@ -1,9 +1,16 @@
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { ArrowLeft } from 'lucide-react';
 import LoanApplicationForm from '@/components/forms/loan-application-form';
 import { Button } from '@/components/ui/button';
 
 export default function NewApplication() {
+  const [, navigate] = useLocation();
+  
+  const handleSuccess = () => {
+    // Navigate back to applications page after successful submission
+    navigate('/applications');
+  };
+
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex items-center gap-4">
@@ -21,12 +28,7 @@ export default function NewApplication() {
         </div>
       </div>
       
-      <LoanApplicationForm 
-        onSuccess={() => {
-          // Could redirect or show success message
-          console.log('Application submitted successfully');
-        }}
-      />
+      <LoanApplicationForm onSuccess={handleSuccess} />
     </div>
   );
 }

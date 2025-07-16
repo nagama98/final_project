@@ -54,6 +54,7 @@ export class OpenAIService {
       }
 
       // Step 1: Try OpenAI for intent analysis
+      console.log('🔵 Attempting Azure OpenAI call...');
       const intentResponse = await this.client.chat.completions.create({
         model: this.getChatModel(),
         messages: [
@@ -74,8 +75,10 @@ export class OpenAIService {
             content: message
           }
         ],
-        response_format: { type: "json_object" }
+        response_format: { type: "json_object" },
+        temperature: 0.3
       });
+      console.log('🟢 Azure OpenAI call successful');
 
       const intent = JSON.parse(intentResponse.choices[0].message.content || "{}");
 
