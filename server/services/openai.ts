@@ -163,19 +163,25 @@ I can also answer general questions about loan management processes.`
 
     } catch (error: any) {
       console.error('Error processing chat query:', error);
+      console.error('Error details:', {
+        message: error.message,
+        status: error.status,
+        code: error.code,
+        name: error.name,
+        type: error.type
+      });
       
       // Check if it's an authentication error or OpenAI related error
       if ((error.status === 401) || 
           (error.code === 'invalid_api_key') || 
           (error.name === 'AuthenticationError') ||
           (error instanceof Error && error.message.includes('API key'))) {
-        console.log('OpenAI authentication failed, using fallback mode');
+        console.log('🔴 Azure OpenAI authentication failed, using fallback mode');
         return this.handleQueryWithoutAPI(message);
       }
       
-      return {
-        response: "I'm sorry, I encountered an error while processing your request. Please try again or contact support if the issue persists."
-      };
+      console.log('🔴 Azure OpenAI request failed, using fallback mode');
+      return this.handleQueryWithoutAPI(message);
     }
   }
 
