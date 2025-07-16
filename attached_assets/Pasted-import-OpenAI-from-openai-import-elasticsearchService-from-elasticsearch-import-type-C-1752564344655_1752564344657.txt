@@ -1,0 +1,196 @@
+import OpenAI from "openai";
+import { elasticsearchService } from "./elasticsearch";
+import type { ChatQuery } from "@shared/schema";
+
+// Azure OpenAI configuration
+const openai = new OpenAI({
+  apiKey: "1IMfC4yz9JrWlrMSoJ8ROK8gsY24zjTpoZe0irVMAQTzkarSuEBFJQQJ99BGACYeBjFXJ3w3AAABACOGnL14",
+  baseURL: "https://openaikeyelastic.openai.azure.com/openai/deployments/gpt-4o",
+  defaultHeaders: {
+    "api-key": "1IMfC4yz9JrWlrMSoJ8ROK8gsY24zjTpoZe0irVMAQTzkarSuEBFJQQJ99BGACYeBjFXJ3w3AAABACOGnL14"
+  },
+  defaultQuery: {
+    "api-version": "2025-01-01-preview" // Use the latest supported API version
+  }
+});
+
+const deploymentName = "gpt-4o";
+
+export class ChatbotService {
+  async processLoanQuery(chatQuery: ChatQuery): Promise<{
+    response: string;
+    loans?: any[];
+    metadata?: any;
+  }> {
+    try {
+      const intentResponse = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: `You are a loan management assistant. Analyze the user's query and extract search parameters for a loan database. 
+            Respond with JSON containing these fields:
+            - "searchType": "specific_search" | "general_question" | "help"
+            - "parameters": object with loan search filters like status, loanType, minAmount, maxAmount, etc.
+            - "query": the processed search query for text search
+            - "intent": brief description of what the user wants
+            
+            Valid statuses: draft, pending, under_review, approved, rejected, disbursed, active, completed, defaulted
+            Valid loan types: personal, mortgage, auto, business, student, home_equity`
+          },
+          {
+            role: "user",
+            content: chatQuery.message
+          }
+        ],
+        response_format: { type: "json_object" }
+      });
+
+      const intent = JSON.parse(intentResponse.choices[0].message.content || "{}");
+
+      if (intent.searchType === "specific_search") {
+        const searchResult = await elasticsearchService.naturalLanguageQuery(chatQuery.message);
+
+        let contextData = null;
+        if (intent.parameters?.needsAggregation || chatQuery.message.toLowerCase().includes('total') || 
+            chatQuery.message.toLowerCase().includes('average') || chatQuery.message.toLowerCase().includes('count')) {
+          contextData = await elasticsearchService.getAggregations();
+        }
+
+        const responsePrompt = `Based on the loan search results, provide a helpful response to the user. 
+        
+        User Query: "${chatQuery.message}"
+        Search Results: ${searchResult.loans.length} loans found
+        Interpretation: ${searchResult.interpretation}
+        
+        ${contextData ? `Additional Context: ${JSON.stringify(contextData)}` : ''}
+
+        Provide a conversational response that summarizes the findings and offers to help with more specific queries.`;
+
+        const summaryResponse = await openai.chat.completions.create({
+          model: deploymentName,
+          messages: [
+            {
+              role: "system",
+              content: "You are a helpful loan management assistant. Provide clear, professional responses about loan data."
+            },
+            {
+              role: "user",
+              content: responsePrompt
+            }
+          ]
+        });
+
+        return {
+          response: summaryResponse.choices[0].message.content || "I found some loans matching your criteria.",
+          loans: searchResult.loans.slice(0, 5),
+          metadata: {
+            total: searchResult.loans.length,
+            interpretation: searchResult.interpretation,
+            aggregations: contextData
+          }
+        };
+
+      } else if (intent.searchType === "general_question") {
+        const systemPrompt = `You are a loan management expert assistant. Answer questions about loan management, banking processes, and provide helpful guidance. 
+        
+        You have access to a loan database with the following loan types: personal, mortgage, auto, business, student, home_equity
+        And statuses: draft, pending, under_review, approved, rejected, disbursed, active, completed, defaulted
+        
+        If the user asks about specific data, suggest they ask for specific searches like "show me all pending mortgages" or "find loans over $100,000".`;
+
+        const generalResponse = await openai.chat.completions.create({
+          model: deploymentName,
+          messages: [
+            {
+              role: "system",
+              content: systemPrompt
+            },
+            ...(chatQuery.conversationHistory || []).map(msg => ({
+              role: msg.role as "user" | "assistant",
+              content: msg.content
+            })),
+            {
+              role: "user",
+              content: chatQuery.message
+            }
+          ]
+        });
+
+        return {
+          response: generalResponse.choices[0].message.content || "I'm here to help with loan management questions."
+        };
+
+      } else {
+        return {
+          response: `I can help you search and analyze loan data. Here are some things you can ask me:
+
+• "Show me all pending mortgage loans"
+• "Find loans over $100,000"
+• "What loans were approved this month?"
+• "How many personal loans are active?"
+• "Find loans with credit scores below 650"
+• "Show me rejected business loans"
+
+I can also answer general questions about loan management processes and help you understand your loan data better.`
+        };
+      }
+
+    } catch (error) {
+      console.error('Error processing chat query:', error);
+      return {
+        response: "I'm sorry, I encountered an error while processing your request. Please try again or contact support if the issue persists."
+      };
+    }
+  }
+
+  async generateLoanSummary(loanId: string): Promise<string> {
+    try {
+      const searchResult = await elasticsearchService.searchLoans({ 
+        query: loanId, 
+        page: 1, 
+        limit: 1 
+      });
+
+      if (searchResult.loans.length === 0) {
+        return "Loan not found.";
+      }
+
+      const loan = searchResult.loans[0];
+
+      const summaryPrompt = `Generate a professional summary for this loan application:
+      
+      Loan ID: ${loan.loanId}
+      Customer: ${loan.customerFirstName} ${loan.customerLastName}
+      Type: ${loan.loanType}
+      Amount: $${loan.loanAmount?.toLocaleString()}
+      Status: ${loan.status}
+      Credit Score: ${loan.creditScore}
+      Annual Income: $${loan.annualIncome?.toLocaleString()}
+      Purpose: ${loan.purpose}
+      
+      Provide a concise 2-3 sentence summary highlighting key details and current status.`;
+
+      const response = await openai.chat.completions.create({
+        model: deploymentName,
+        messages: [
+          {
+            role: "system",
+            content: "You are a loan officer assistant. Generate professional, concise loan summaries."
+          },
+          {
+            role: "user",
+            content: summaryPrompt
+          }
+        ]
+      });
+
+      return response.choices[0].message.content || "Unable to generate summary.";
+    } catch (error) {
+      console.error('Error generating loan summary:', error);
+      return "Error generating loan summary.";
+    }
+  }
+}
+
+export const chatbotService = new ChatbotService();
