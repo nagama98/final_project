@@ -3,13 +3,9 @@ import {
   FileText, 
   Users, 
   FolderOpen, 
-  Calculator, 
-  TrendingUp, 
-  Bot, 
   Settings, 
   Shield,
-  Plus,
-  Database
+  Plus
 } from "lucide-react";
 import { useLocation } from "wouter";
 
@@ -25,15 +21,6 @@ export default function Sidebar() {
         { name: "New Application", icon: Plus, href: "/applications/new" },
         { name: "Customers", icon: Users, href: "/customers" },
         { name: "Documents", icon: FolderOpen, href: "/documents" },
-      ]
-    },
-    {
-      title: "Tools",
-      items: [
-        { name: "Data Management", icon: Database, href: "/data-management" },
-        { name: "Risk Assessment", icon: Calculator, href: "/risk" },
-        { name: "Analytics", icon: TrendingUp, href: "/analytics" },
-        { name: "AI Assistant", icon: Bot, href: "/ai-assistant" },
       ]
     },
     {
