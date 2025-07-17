@@ -142,13 +142,20 @@ export class ElasticsearchService {
 
       const body = [];
       for (const doc of documents) {
-        // Index action
-        body.push({
+        // Index action - let Elasticsearch auto-generate ID if none provided
+        const indexAction: any = {
           index: {
-            _index: indexName,
-            _id: doc.id || doc.custId || doc.applicationId
+            _index: indexName
           }
-        });
+        };
+        
+        // Only add ID if it exists and is valid
+        const docId = doc.id || doc.custId || doc.applicationId;
+        if (docId) {
+          indexAction.index._id = docId;
+        }
+        
+        body.push(indexAction);
         // Document data
         body.push(doc);
       }
@@ -156,11 +163,21 @@ export class ElasticsearchService {
       const response = await this.client.bulk({ body });
       
       if (response.errors) {
-        console.error('Bulk indexing had errors:', response.items);
-        throw new Error('Bulk indexing failed');
+        // Log first few errors for debugging
+        const errorItems = response.items.filter((item: any) => item.index && item.index.error);
+        console.error(`Bulk indexing had ${errorItems.length} errors:`, JSON.stringify(errorItems.slice(0, 3), null, 2));
+        
+        // Don't throw error if only some documents failed
+        const successfulItems = response.items.filter((item: any) => item.index && !item.index.error);
+        console.log(`Successfully indexed ${successfulItems.length} out of ${documents.length} documents to ${indexName}`);
+        
+        // If all documents failed, throw error
+        if (successfulItems.length === 0) {
+          throw new Error(`All ${documents.length} documents failed to index`);
+        }
+      } else {
+        console.log(`Successfully bulk indexed ${documents.length} documents to ${indexName}`);
       }
-      
-      console.log(`Successfully bulk indexed ${documents.length} documents to ${indexName}`);
     } catch (error) {
       console.error(`Failed to bulk index documents:`, error);
       throw error;
