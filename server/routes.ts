@@ -10,6 +10,7 @@ import { customerGenerator } from "./services/customer-generator";
 import { insertLoanApplicationSchema, insertDocumentSchema, insertChatMessageSchema } from "@shared/schema";
 import { fixCustomerData } from "./fix-customer-data";
 import multer from "multer";
+import { z } from "zod";
 
 const upload = multer({ dest: 'uploads/' });
 
@@ -289,7 +290,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create loan application
   app.post("/api/applications", async (req, res) => {
     try {
-      const validatedData = insertLoanApplicationSchema.parse(req.body);
+      // Create a custom validation schema that handles both string and number customerId
+      const apiLoanApplicationSchema = insertLoanApplicationSchema.extend({
+        customerId: z.union([z.string(), z.number()]).transform(val => 
+          typeof val === 'string' ? val : val.toString()
+        ),
+        custId: z.string().optional(),
+        customerName: z.string().optional(),
+        customerEmail: z.string().email().optional(),
+        income: z.string().optional(),
+        purpose: z.string().optional(),
+        collateral: z.string().optional(),
+      });
+      
+      const validatedData = apiLoanApplicationSchema.parse(req.body);
       
       // Try to create in Elasticsearch first, fallback to memory storage
       let application;
