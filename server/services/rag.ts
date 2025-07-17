@@ -152,15 +152,15 @@ export class RAGService {
     }
 
     // Loan type queries
-    if (lowerQuery.includes('personal loan')) {
+    if (lowerQuery.includes('personal loan') || lowerQuery.includes('personal')) {
       result.filters.loanType = 'personal';
     } else if (lowerQuery.includes('mortgage') || lowerQuery.includes('home loan')) {
       result.filters.loanType = 'mortgage';
     } else if (lowerQuery.includes('auto loan') || lowerQuery.includes('car loan')) {
       result.filters.loanType = 'auto';
-    } else if (lowerQuery.includes('business loan')) {
+    } else if (lowerQuery.includes('business loan') || lowerQuery.includes('business')) {
       result.filters.loanType = 'business';
-    } else if (lowerQuery.includes('student loan')) {
+    } else if (lowerQuery.includes('student loan') || lowerQuery.includes('student')) {
       result.filters.loanType = 'student';
     }
 
@@ -364,6 +364,8 @@ export class RAGService {
       // Step 1: Parse natural language query to understand intent
       const parsedQuery = this.parseNaturalLanguageQuery(userQuery);
       console.log('🔍 Parsed query intent:', parsedQuery.intent);
+      console.log('🔍 Parsed query filters:', JSON.stringify(parsedQuery.filters));
+      console.log('🔍 Parsed query parameters:', JSON.stringify(parsedQuery.parameters));
       
       // Step 2: Get loan applications from Elasticsearch storage directly
       const searchResults = await this.executeDirectElasticsearchSearch(parsedQuery);
@@ -405,14 +407,14 @@ export class RAGService {
       
       let filteredApplications = allApplications;
       
-      // Apply filters based on parsed query
-      if (parsedQuery.intent === 'status_filter' && parsedQuery.filters.status) {
+      // Apply filters based on parsed query - handle multiple filters
+      if (parsedQuery.filters.status) {
         filteredApplications = filteredApplications.filter(app => 
           app.status.toLowerCase() === parsedQuery.filters.status.toLowerCase()
         );
       }
       
-      if (parsedQuery.intent === 'loan_type_filter' && parsedQuery.filters.loanType) {
+      if (parsedQuery.filters.loanType) {
         filteredApplications = filteredApplications.filter(app => 
           app.loanType.toLowerCase() === parsedQuery.filters.loanType.toLowerCase()
         );
@@ -514,9 +516,10 @@ Guidelines:
 
     // List queries
     if (lowerQuery.includes('show') || lowerQuery.includes('list') || lowerQuery.includes('find')) {
-      const applicationList = searchResults.slice(0, 10).map((app, index) => 
-        `${index + 1}. ${app.customerName} (${app.applicationId}) - ${app.loanType} loan for $${app.amount?.toLocaleString()} - Status: ${app.status} - Risk: ${app.riskLevel}`
-      ).join('\n');
+      const applicationList = searchResults.slice(0, 10).map((app, index) => {
+        const riskLevel = app.riskScore > 70 ? 'High' : app.riskScore > 30 ? 'Medium' : 'Low';
+        return `${index + 1}. ${app.customerName} (${app.applicationId}) - ${app.loanType} loan for $${app.amount?.toLocaleString()} - Status: ${app.status} - Risk: ${riskLevel} (${app.riskScore})`;
+      }).join('\n');
 
       let prefix = 'Here are the loan applications I found:\n\n';
       if (searchResults.length > 10) {

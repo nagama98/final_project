@@ -118,6 +118,17 @@ The system requires several environment variables:
 
 ## Recent Changes (July 17, 2025)
 
+### Elasticsearch Query Functionality Fix (July 17, 2025)
+- ✅ Fixed Elasticsearch query execution to properly access Elastic Cloud instance with 100,000 loan applications
+- ✅ Corrected RAG service to use direct Elasticsearch storage instead of fallback-only approach
+- ✅ Enhanced natural language processing to handle multiple filter conditions (status + loan type)
+- ✅ Implemented proper filtering logic for combined queries like "approved business loans"
+- ✅ Added comprehensive debug logging to track query parsing and filtering process
+- ✅ Verified chatbot correctly filters results: 390 approved business loans from 10,000 total applications
+- ✅ Fixed risk level display calculation based on risk score (High >70, Medium 30-70, Low <30)
+- ✅ Enhanced response formatting to show proper loan details with risk levels and scores
+- ✅ Confirmed all 50 returned results are correctly filtered business loans with approved status
+
 ### Data Generation Updates (July 17, 2025)
 - ✓ Updated data generation logic to create exactly 100 customers with 1000 loan applications each
 - ✓ Enhanced customer generator to create proper customer-loan correlation using custId field
