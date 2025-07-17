@@ -1,12 +1,8 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import AdvancedSearch from "@/components/dashboard/advanced-search";
 import ApplicationsTable from "@/components/dashboard/applications-table";
-import LoanApplicationForm from "@/components/forms/loan-application-form";
 
 interface SearchFilters {
   loanType: string;
@@ -40,8 +36,6 @@ export default function Applications() {
     startDate: undefined,
     endDate: undefined
   });
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-
   const { data: applications, isLoading } = useQuery<LoanApplication[]>({
     queryKey: ['/api/applications'],
   });
@@ -50,32 +44,12 @@ export default function Applications() {
     setSearchFilters(filters);
   };
 
-  const handleApplicationSuccess = () => {
-    setIsDialogOpen(false);
-  };
-
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Loan Applications</h1>
-            <p className="text-gray-600">Manage and track all loan applications</p>
-          </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-primary hover:bg-blue-700">
-                <Plus className="mr-2 h-4 w-4" />
-                New Application
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>New Loan Application</DialogTitle>
-              </DialogHeader>
-              <LoanApplicationForm onSuccess={handleApplicationSuccess} />
-            </DialogContent>
-          </Dialog>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Loan Applications</h1>
+          <p className="text-gray-600">Manage and track all loan applications</p>
         </div>
         <div className="animate-pulse space-y-4">
           <div className="h-32 bg-gray-200 rounded"></div>
@@ -87,25 +61,9 @@ export default function Applications() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Loan Applications</h1>
-          <p className="text-gray-600">Manage and track all loan applications</p>
-        </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-primary hover:bg-blue-700">
-              <Plus className="mr-2 h-4 w-4" />
-              New Application
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>New Loan Application</DialogTitle>
-            </DialogHeader>
-            <LoanApplicationForm onSuccess={handleApplicationSuccess} />
-          </DialogContent>
-        </Dialog>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Loan Applications</h1>
+        <p className="text-gray-600">Manage and track all loan applications</p>
       </div>
 
       {/* Advanced Search */}
