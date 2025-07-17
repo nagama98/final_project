@@ -26,6 +26,7 @@ export const loanApplications = pgTable("loan_applications", {
   riskScore: integer("risk_score"),
   documents: json("documents").$type<string[]>().default([]),
   notes: text("notes"),
+  description: text("description"), // Complete loan description for semantic search
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

@@ -5,6 +5,7 @@ import { elasticsearchStorage } from "./storage-elasticsearch";
 import { elasticsearch } from "./services/elasticsearch";
 import { rag } from "./services/rag";
 import { openai } from "./services/openai";
+import { semanticRAGService } from './services/semantic-rag';
 import { dataGenerator } from "./services/data-generator";
 import { customerGenerator } from "./services/customer-generator";
 import { insertLoanApplicationSchema, insertDocumentSchema, insertChatMessageSchema } from "@shared/schema";
@@ -116,6 +117,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Failed to generate data:", error);
       res.status(500).json({ error: "Failed to generate data" });
+    }
+  });
+
+  // Recreate index with semantic_text mapping
+  app.post("/api/recreate-index", async (req, res) => {
+    try {
+      console.log('🔄 Recreating loan_applications index with semantic_text mapping...');
+      
+      // Recreate the loan_applications index with semantic_text mapping
+      await elasticsearch.recreateIndex('loan_applications', {
+        properties: {
+          id: { type: 'integer' },
+          applicationId: { type: 'keyword' },
+          customerId: { type: 'keyword' },
+          custId: { type: 'keyword' },
+          customerName: { type: 'text' },
+          customerEmail: { type: 'keyword' },
+          loanType: { type: 'keyword' },
+          amount: { type: 'text' },
+          term: { type: 'integer' },
+          status: { type: 'keyword' },
+          interestRate: { type: 'text' },
+          riskScore: { type: 'integer' },
+          purpose: { type: 'text' },
+          income: { type: 'text' },
+          creditScore: { type: 'integer' },
+          collateral: { type: 'keyword' },
+          description: { 
+            type: 'semantic_text',
+            inference_id: 'sentence-transformers__all-minilm-l6-v2'
+          },
+          documents: { type: 'text' },
+          notes: { type: 'text' },
+          createdAt: { type: 'date' },
+          updatedAt: { type: 'date' },
+          embedding: {
+            type: 'dense_vector',
+            dims: 1536 // OpenAI embedding dimension
+          }
+        }
+      });
+      
+      res.json({
+        message: "Successfully recreated loan_applications index with semantic_text mapping",
+        indexName: "loan_applications",
+        mappingType: "semantic_text"
+      });
+    } catch (error) {
+      console.error('Index recreation failed:', error);
+      res.status(500).json({ error: "Failed to recreate index" });
     }
   });
 
@@ -492,7 +543,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Enhanced chatbot with natural language to Elasticsearch query conversion
+  // Semantic search endpoint
+  app.post("/api/semantic-search", async (req, res) => {
+    try {
+      const { query, filters = {} } = req.body;
+      
+      if (!query) {
+        return res.status(400).json({ error: "Query is required" });
+      }
+
+      console.log('🔍 Semantic search request:', query);
+      
+      // Use semantic search with filters
+      const results = await semanticRAGService.searchWithFilters(query, filters);
+      
+      res.json({
+        results: results.map(hit => ({
+          id: hit._id,
+          score: hit._score,
+          source: hit._source,
+          highlight: hit.highlight
+        })),
+        total: results.length,
+        query: query,
+        filters: filters
+      });
+    } catch (error) {
+      console.error('Semantic search error:', error);
+      res.status(500).json({ error: "Failed to perform semantic search" });
+    }
+  });
+
+  // Enhanced chatbot with semantic RAG functionality
   app.post("/api/chat", async (req, res) => {
     try {
       const { message, userId } = req.body;
@@ -503,12 +585,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('🤖 Chatbot received message:', message);
       
-      // New chatbot flow:
-      // 1. Natural language -> Elasticsearch query
-      // 2. Execute query on loan applications index
-      // 3. Send results to AI model
-      // 4. Return natural language response
-      const result = await rag.generateRAGResponse(message, userId || 1);
+      // Enhanced chatbot flow:
+      // 1. Check if it's a complex query suitable for semantic search
+      // 2. Use semantic RAG service for natural language processing
+      // 3. Fallback to traditional RAG for simple queries
+      // 4. Return AI-generated response
+      
+      let result;
+      
+      // Use semantic RAG for complex analytical queries, traditional RAG for simple lookup queries
+      const isComplexQuery = message.length > 50 && 
+        (message.includes('relationship') || message.includes('analysis') || message.includes('understand') || 
+         message.includes('compare') || message.includes('trends') || message.includes('patterns') ||
+         message.includes('correlation') || message.includes('complex') || message.includes('analytical'));
+      
+      console.log(`📊 Query analysis: length=${message.length}, isComplexQuery=${isComplexQuery}`);
+      
+      if (isComplexQuery) {
+        console.log('🧠 Using semantic RAG for complex analytical query');
+        const semanticResponse = await semanticRAGService.processQuery(message);
+        result = {
+          response: semanticResponse,
+          context: [],
+          metadata: { useSemanticRAG: true }
+        };
+      } else {
+        console.log('🔍 Using traditional RAG for simple query');
+        result = await rag.generateRAGResponse(message, userId || 1);
+      }
       
       // Store chat message in Elasticsearch if available, fallback to memory
       try {
@@ -530,8 +634,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         response: result.response,
         context: result.context,
         metadata: {
-          searchResults: result.context.length,
-          queryProcessed: true
+          searchResults: result.context?.length || 0,
+          queryProcessed: true,
+          useSemanticRAG: result.metadata?.useSemanticRAG || false
         }
       });
     } catch (error) {

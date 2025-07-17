@@ -178,15 +178,15 @@ export class RAGService {
     }
 
     const rangeMatches = lowerQuery.match(/between\s+\$?(\d+(?:,\d{3})*(?:\.\d{2})?)\s+and\s+\$?(\d+(?:,\d{3})*(?:\.\d{2})?)/);
-    if (rangeMatches) {
+    if (rangeMatches && rangeMatches[1] && rangeMatches[2]) {
       result.intent = 'amount_filter';
       result.parameters.minAmount = parseFloat(rangeMatches[1].replace(/,/g, ''));
       result.parameters.maxAmount = parseFloat(rangeMatches[2].replace(/,/g, ''));
     }
 
-    // Customer-specific queries
-    const customerMatches = lowerQuery.match(/for\s+([a-zA-Z\s]+)/);
-    if (customerMatches && !lowerQuery.includes('loan for')) {
+    // Customer-specific queries (more specific pattern to avoid false matches)
+    const customerMatches = lowerQuery.match(/(?:for customer|for client|loans for)\s+([a-zA-Z\s]+)/);
+    if (customerMatches && customerMatches[1] && customerMatches[1].length < 30) {
       result.intent = 'customer_filter';
       result.parameters.customerName = customerMatches[1].trim();
     }

@@ -212,6 +212,15 @@ export class CustomerGeneratorService {
         const loanType = loanTypes[Math.floor(Math.random() * loanTypes.length)];
         const applicationId = `LA-${new Date().getFullYear()}-${String(totalApplications + loanIndex + 1).padStart(6, '0')}`;
         
+        const amount = this.generateRandomAmount(loanType);
+        const term = this.generateRandomTerm(loanType);
+        const status = statuses[Math.floor(Math.random() * statuses.length)];
+        const riskScore = Math.floor(Math.random() * 100) + 1;
+        const purpose = this.generateLoanPurpose(loanType);
+        const creditScore = customer.creditScore || 700;
+        const interestRate = this.generateInterestRate(loanType, creditScore);
+        const collateral = loanType === 'mortgage' || loanType === 'auto' ? 'Yes' : 'No';
+        
         const application = {
           id: (totalApplications + loanIndex + 1).toString(),
           applicationId,
@@ -220,17 +229,32 @@ export class CustomerGeneratorService {
           customerName: `${customer.firstName} ${customer.lastName}`,
           customerEmail: customer.email,
           loanType,
-          amount: this.generateRandomAmount(loanType),
-          term: this.generateRandomTerm(loanType),
-          status: statuses[Math.floor(Math.random() * statuses.length)],
-          riskScore: Math.floor(Math.random() * 100) + 1,
-          purpose: this.generateLoanPurpose(loanType),
+          amount,
+          term,
+          status,
+          riskScore,
+          purpose,
           income: (customer.annualIncome || 50000).toString(),
-          creditScore: customer.creditScore || 700,
-          collateral: loanType === 'mortgage' || loanType === 'auto' ? 'Yes' : 'No',
+          creditScore,
+          collateral,
           notes: `Application for ${customer.firstName} ${customer.lastName}`,
           documents: [],
-          interestRate: this.generateInterestRate(loanType, customer.creditScore || 700),
+          interestRate,
+          description: this.generateLoanDescription({
+            applicationId,
+            customerName: `${customer.firstName} ${customer.lastName}`,
+            customerId: customer.custId,
+            loanType,
+            amount,
+            term,
+            status,
+            riskScore,
+            purpose,
+            income: customer.annualIncome || 50000,
+            creditScore,
+            collateral,
+            interestRate
+          }),
           createdAt: this.generateRandomDate(365).toISOString(),
           updatedAt: new Date().toISOString()
         };
@@ -317,6 +341,53 @@ export class CustomerGeneratorService {
     const finalRate = Math.max(baseRate + adjustment + (Math.random() * 2 - 1), 2);
     
     return finalRate.toFixed(2);
+  }
+
+  private generateLoanDescription(loanData: any): string {
+    const {
+      applicationId, customerName, customerId, loanType, amount, term, status, 
+      riskScore, purpose, income, creditScore, collateral, interestRate
+    } = loanData;
+
+    // Generate risk level based on score
+    const riskLevel = riskScore > 70 ? 'High' : riskScore > 30 ? 'Medium' : 'Low';
+    
+    // Format amount with commas
+    const formattedAmount = parseInt(amount).toLocaleString();
+    
+    // Create comprehensive description for semantic search
+    const description = `
+Loan Application ${applicationId}: ${loanType.charAt(0).toUpperCase() + loanType.slice(1)} loan application for customer ${customerName} (ID: ${customerId}). 
+Amount requested: $${formattedAmount} over ${term} ${term === 1 ? 'month' : term > 12 ? Math.floor(term/12) + ' years' : 'months'}. 
+Current status: ${status.replace('_', ' ')}. 
+Purpose: ${purpose}. 
+Customer profile: Annual income $${income.toLocaleString()}, credit score ${creditScore}, ${collateral === 'Yes' ? 'secured with collateral' : 'unsecured loan'}. 
+Risk assessment: ${riskLevel} risk (score: ${riskScore}/100). 
+Interest rate: ${interestRate}% APR. 
+Application details: ${status === 'approved' ? 'Approved for disbursement' : status === 'rejected' ? 'Rejected due to risk factors' : status === 'disbursed' ? 'Funds successfully disbursed' : status === 'under_review' ? 'Currently under review by loan officers' : 'Pending initial review'}. 
+Loan type specifics: ${this.getLoanTypeDetails(loanType, amount, term, purpose)}.
+    `.trim().replace(/\s+/g, ' ');
+
+    return description;
+  }
+
+  private getLoanTypeDetails(loanType: string, amount: string, term: number, purpose: string): string {
+    const amountNum = parseInt(amount);
+    
+    switch (loanType) {
+      case 'personal':
+        return `Personal loan for ${purpose.toLowerCase()}, unsecured financing for individual needs`;
+      case 'mortgage':
+        return `Home mortgage loan for ${purpose.toLowerCase()}, secured by real estate property, ${term/12} year term`;
+      case 'auto':
+        return `Vehicle financing for ${purpose.toLowerCase()}, secured by automobile, ${term} month payment plan`;
+      case 'business':
+        return `Business loan for ${purpose.toLowerCase()}, commercial financing for business operations`;
+      case 'student':
+        return `Educational loan for ${purpose.toLowerCase()}, financing for academic expenses and tuition`;
+      default:
+        return `Standard loan for ${purpose.toLowerCase()}, general purpose financing`;
+    }
   }
 
   private async insertApplicationBatch(applications: any[]): Promise<void> {

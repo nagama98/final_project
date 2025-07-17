@@ -38,6 +38,30 @@ export class ElasticsearchService {
     }
   }
 
+  async deleteIndex(indexName: string): Promise<void> {
+    try {
+      const exists = await this.client.indices.exists({ index: indexName });
+      if (exists) {
+        await this.client.indices.delete({ index: indexName });
+        console.log(`Successfully deleted index ${indexName}`);
+      }
+    } catch (error) {
+      console.error(`Failed to delete index ${indexName}:`, error);
+      throw error;
+    }
+  }
+
+  async recreateIndex(indexName: string, mapping: any): Promise<void> {
+    try {
+      await this.deleteIndex(indexName);
+      await this.createIndex(indexName, mapping);
+      console.log(`Successfully recreated index ${indexName} with new mapping`);
+    } catch (error) {
+      console.error(`Failed to recreate index ${indexName}:`, error);
+      throw error;
+    }
+  }
+
   async indexDocument(indexName: string, id: string, document: any): Promise<void> {
     try {
       await this.client.index({
@@ -291,6 +315,114 @@ export class ElasticsearchService {
     return this.search(indexName, query);
   }
 
+  // Semantic search with RRF (Reciprocal Rank Fusion) - based on Elasticsearch AI playground pattern
+  async semanticSearch(indexName: string, searchQuery: string, size: number = 50): Promise<any> {
+    try {
+      const query = {
+        retriever: {
+          rrf: {
+            retrievers: [
+              {
+                standard: {
+                  query: {
+                    semantic: {
+                      field: 'description',
+                      query: searchQuery
+                    }
+                  }
+                }
+              },
+              {
+                standard: {
+                  query: {
+                    semantic: {
+                      field: 'customerName',
+                      query: searchQuery
+                    }
+                  }
+                }
+              },
+              {
+                standard: {
+                  query: {
+                    semantic: {
+                      field: 'loanType',
+                      query: searchQuery
+                    }
+                  }
+                }
+              },
+              {
+                standard: {
+                  query: {
+                    semantic: {
+                      field: 'status',
+                      query: searchQuery
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        highlight: {
+          fields: {
+            description: {
+              type: 'semantic',
+              number_of_fragments: 2,
+              order: 'score'
+            },
+            customerName: {
+              type: 'semantic',
+              number_of_fragments: 2,
+              order: 'score'
+            },
+            loanType: {
+              type: 'semantic',
+              number_of_fragments: 2,
+              order: 'score'
+            },
+            status: {
+              type: 'semantic',
+              number_of_fragments: 2,
+              order: 'score'
+            }
+          }
+        },
+        size
+      };
+
+      const response = await this.search(indexName, query);
+      console.log(`🔍 Semantic search returned ${response.hits.hits.length} results`);
+      return response;
+    } catch (error) {
+      console.error('Semantic search failed, falling back to regular search:', error);
+      
+      // Fallback to regular multi-match search
+      const fallbackQuery = {
+        query: {
+          multi_match: {
+            query: searchQuery,
+            fields: ['description^2', 'customerName^1.5', 'loanType', 'status', 'purpose'],
+            type: 'best_fields',
+            fuzziness: 'AUTO'
+          }
+        },
+        highlight: {
+          fields: {
+            description: {},
+            customerName: {},
+            loanType: {},
+            status: {}
+          }
+        },
+        size
+      };
+
+      return this.search(indexName, fallbackQuery);
+    }
+  }
+
   async initializeIndices(): Promise<void> {
     // Users index
     await this.createIndex('users', {
@@ -332,8 +464,8 @@ export class ElasticsearchService {
       }
     });
 
-    // Loan applications index
-    await this.createIndex('loan_applications', {
+    // Loan applications index with semantic_text mapping  
+    await this.recreateIndex('loan_applications', {
       properties: {
         id: { type: 'integer' },
         applicationId: { type: 'keyword' },
@@ -347,6 +479,14 @@ export class ElasticsearchService {
         status: { type: 'keyword' },
         interestRate: { type: 'text' },
         riskScore: { type: 'integer' },
+        purpose: { type: 'text' },
+        income: { type: 'text' },
+        creditScore: { type: 'integer' },
+        collateral: { type: 'keyword' },
+        description: { 
+          type: 'semantic_text',
+          inference_id: 'sentence-transformers__all-minilm-l6-v2'
+        },
         documents: { type: 'text' },
         notes: { type: 'text' },
         createdAt: { type: 'date' },
