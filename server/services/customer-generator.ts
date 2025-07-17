@@ -217,37 +217,44 @@ export class CustomerGeneratorService {
         const loanType = loanTypes[Math.floor(Math.random() * loanTypes.length)];
         const applicationId = `LA-${new Date().getFullYear()}-${String(totalApplications + loanIndex + 1).padStart(6, '0')}`;
         
+        // Generate unique customer name for each loan application
+        const uniqueFirstName = this.getRandomElement(this.firstNames);
+        const uniqueLastName = this.getRandomElement(this.lastNames);
+        const uniqueCustomerName = `${uniqueFirstName} ${uniqueLastName}`;
+        const uniqueEmail = `${uniqueFirstName.toLowerCase()}.${uniqueLastName.toLowerCase()}@email.com`;
+        
         const amount = this.generateRandomAmount(loanType);
         const term = this.generateRandomTerm(loanType);
         const status = statuses[Math.floor(Math.random() * statuses.length)];
         const riskScore = Math.floor(Math.random() * 100) + 1;
         const purpose = this.generateLoanPurpose(loanType);
-        const creditScore = customer.creditScore || 700;
+        const creditScore = Math.floor(Math.random() * 350) + 500; // Random credit score 500-850
         const interestRate = this.generateInterestRate(loanType, creditScore);
         const collateral = loanType === 'mortgage' || loanType === 'auto' ? 'Yes' : 'No';
+        const income = Math.floor(Math.random() * 200000) + 30000; // Random income $30k-$230k
         
         const application = {
           id: (totalApplications + loanIndex + 1).toString(),
           applicationId,
           customerId: customer.custId,
           custId: customer.custId,
-          customerName: `${customer.firstName} ${customer.lastName}`,
-          customerEmail: customer.email,
+          customerName: uniqueCustomerName,
+          customerEmail: uniqueEmail,
           loanType,
           amount,
           term,
           status,
           riskScore,
           purpose,
-          income: (customer.annualIncome || 50000).toString(),
+          income: income.toString(),
           creditScore,
           collateral,
-          notes: `Application for ${customer.firstName} ${customer.lastName}`,
+          notes: `Application for ${uniqueCustomerName}`,
           documents: [],
           interestRate,
           description: this.generateLoanDescription({
             applicationId,
-            customerName: `${customer.firstName} ${customer.lastName}`,
+            customerName: uniqueCustomerName,
             customerId: customer.custId,
             loanType,
             amount,
@@ -255,7 +262,7 @@ export class CustomerGeneratorService {
             status,
             riskScore,
             purpose,
-            income: customer.annualIncome || 50000,
+            income,
             creditScore,
             collateral,
             interestRate
