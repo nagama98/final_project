@@ -14,7 +14,7 @@ export class SemanticRAGService {
   // Get Elasticsearch results with simple semantic search
   async getElasticsearchResults(query: string, size: number = 3): Promise<any[]> {
     try {
-      // First try semantic search on the description field
+      // Use semantic search with ELSER model
       const semanticQuery = {
         query: {
           semantic: {
@@ -26,7 +26,7 @@ export class SemanticRAGService {
         size
       };
 
-      console.log('🔍 Attempting semantic search on description field...');
+      console.log('🔍 Attempting semantic search with ELSER model...');
       const semanticResult = await elasticsearch.search('loan_applications', semanticQuery);
       
       if (semanticResult.hits.hits.length > 0) {
@@ -78,20 +78,22 @@ export class SemanticRAGService {
     let context = '';
     
     for (const hit of results) {
-      // For semantic_text matches, extract text from highlighted fields
-      if (hit.highlight) {
-        const highlightedTexts: string[] = [];
-        for (const values of Object.values(hit.highlight)) {
-          if (Array.isArray(values)) {
-            highlightedTexts.push(...values);
-          }
-        }
-        context += '\n --- \n' + highlightedTexts.join('\n --- \n');
+      // For enhanced text search, use the description field and other key fields
+      if (hit.description) {
+        context += `${hit.description}\n`;
       } else {
-        // Fall back to source field
-        const sourceField = this.indexSourceFields['loan_applications'][0];
-        const hitContext = hit._source[sourceField];
-        context += `${hitContext}\n`;
+        // Create context from available fields
+        const contextParts = [];
+        if (hit.customerName) contextParts.push(`Customer: ${hit.customerName}`);
+        if (hit.loanType) contextParts.push(`Loan Type: ${hit.loanType}`);
+        if (hit.status) contextParts.push(`Status: ${hit.status}`);
+        if (hit.amount) contextParts.push(`Amount: $${hit.amount}`);
+        if (hit.creditScore) contextParts.push(`Credit Score: ${hit.creditScore}`);
+        if (hit.riskScore) contextParts.push(`Risk Score: ${hit.riskScore}`);
+        
+        if (contextParts.length > 0) {
+          context += contextParts.join(', ') + '\n';
+        }
       }
     }
 

@@ -485,7 +485,7 @@ export class ElasticsearchService {
         collateral: { type: 'keyword' },
         description: { 
           type: 'semantic_text',
-          inference_id: 'sentence-transformers__all-minilm-l6-v2'
+          inference_id: '.elser_model_2'
         },
         documents: { type: 'text' },
         notes: { type: 'text' },

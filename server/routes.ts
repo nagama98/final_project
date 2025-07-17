@@ -146,7 +146,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           collateral: { type: 'keyword' },
           description: { 
             type: 'semantic_text',
-            inference_id: 'sentence-transformers__all-minilm-l6-v2'
+            inference_id: '.elser_model_2'
           },
           documents: { type: 'text' },
           notes: { type: 'text' },
@@ -694,6 +694,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to start data generation" });
+    }
+  });
+
+  // Check Elasticsearch status endpoint
+  app.get('/api/elasticsearch-status', async (req, res) => {
+    try {
+      const indexExists = await elasticsearch.indexExists('loan_applications');
+      const indexCount = await elasticsearch.countDocuments('loan_applications');
+      
+      res.json({
+        status: 'connected',
+        indexExists,
+        documentCount: indexCount,
+        message: 'Elasticsearch is operational'
+      });
+    } catch (error) {
+      console.error('Elasticsearch status check failed:', error);
+      res.status(500).json({ 
+        status: 'error', 
+        message: 'Failed to connect to Elasticsearch',
+        error: error.message 
+      });
     }
   });
 
