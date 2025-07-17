@@ -492,7 +492,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Chat with OpenAI for natural language processing
+  // Enhanced chatbot with natural language to Elasticsearch query conversion
   app.post("/api/chat", async (req, res) => {
     try {
       const { message, userId } = req.body;
@@ -501,8 +501,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Message is required" });
       }
 
-      // Enhanced natural language processing for loan queries
-      const result = await openai.processLoanQuery(message, userId || 1);
+      console.log('🤖 Chatbot received message:', message);
+      
+      // New chatbot flow:
+      // 1. Natural language -> Elasticsearch query
+      // 2. Execute query on loan applications index
+      // 3. Send results to AI model
+      // 4. Return natural language response
+      const result = await rag.generateRAGResponse(message, userId || 1);
       
       // Store chat message in Elasticsearch if available, fallback to memory
       try {
@@ -522,8 +528,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         response: result.response,
-        loans: result.loans || [],
-        metadata: result.metadata || {}
+        context: result.context,
+        metadata: {
+          searchResults: result.context.length,
+          queryProcessed: true
+        }
       });
     } catch (error) {
       console.error('Chat endpoint error:', error);

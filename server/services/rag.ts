@@ -3,6 +3,125 @@ import { openai } from './openai.js';
 import { storage } from '../storage.js';
 
 export class RAGService {
+  // Convert natural language to Elasticsearch query
+  private buildElasticsearchQuery(query: string): any {
+    const lowerQuery = query.toLowerCase();
+    
+    // Base query structure
+    const esQuery: any = {
+      query: {
+        bool: {
+          must: [],
+          filter: [],
+          should: []
+        }
+      },
+      size: 100,
+      sort: [{ createdAt: { order: 'desc' } }]
+    };
+
+    // Customer name search
+    const customerNameMatch = lowerQuery.match(/(?:customer|client|person|individual)\s+(?:named|called)?\s*([a-zA-Z\s]+)/);
+    if (customerNameMatch) {
+      const customerName = customerNameMatch[1].trim();
+      esQuery.query.bool.should.push({
+        multi_match: {
+          query: customerName,
+          fields: ['customerName^2', 'customerFirstName', 'customerLastName'],
+          fuzziness: 'AUTO'
+        }
+      });
+    }
+
+    // Customer ID search
+    const custIdMatch = lowerQuery.match(/(?:customer\s+id|custid|cust-id|customer\s+identifier)\s*:?\s*([a-zA-Z0-9\-]+)/);
+    if (custIdMatch) {
+      esQuery.query.bool.filter.push({
+        term: { customerId: custIdMatch[1].trim() }
+      });
+    }
+
+    // Application/Loan ID search
+    const loanIdMatch = lowerQuery.match(/(?:loan\s+id|application\s+id|loan\s+number|application\s+number)\s*:?\s*([a-zA-Z0-9\-]+)/);
+    if (loanIdMatch) {
+      esQuery.query.bool.filter.push({
+        term: { applicationId: loanIdMatch[1].trim() }
+      });
+    }
+
+    // Status filtering
+    if (lowerQuery.includes('pending') || lowerQuery.includes('under review')) {
+      esQuery.query.bool.filter.push({ term: { status: 'pending' } });
+    } else if (lowerQuery.includes('approved') || lowerQuery.includes('active')) {
+      esQuery.query.bool.filter.push({ term: { status: 'approved' } });
+    } else if (lowerQuery.includes('rejected') || lowerQuery.includes('denied')) {
+      esQuery.query.bool.filter.push({ term: { status: 'rejected' } });
+    } else if (lowerQuery.includes('disbursed')) {
+      esQuery.query.bool.filter.push({ term: { status: 'disbursed' } });
+    }
+
+    // Loan type filtering
+    if (lowerQuery.includes('personal loan')) {
+      esQuery.query.bool.filter.push({ term: { loanType: 'personal' } });
+    } else if (lowerQuery.includes('mortgage') || lowerQuery.includes('home loan')) {
+      esQuery.query.bool.filter.push({ term: { loanType: 'mortgage' } });
+    } else if (lowerQuery.includes('auto loan') || lowerQuery.includes('car loan')) {
+      esQuery.query.bool.filter.push({ term: { loanType: 'auto' } });
+    } else if (lowerQuery.includes('business loan')) {
+      esQuery.query.bool.filter.push({ term: { loanType: 'business' } });
+    } else if (lowerQuery.includes('student loan')) {
+      esQuery.query.bool.filter.push({ term: { loanType: 'student' } });
+    }
+
+    // Amount range filtering
+    const amountAbove = lowerQuery.match(/(?:above|over|more than|greater than)\s+\$?(\d+(?:,\d{3})*(?:\.\d{2})?)/);
+    if (amountAbove) {
+      const amount = parseFloat(amountAbove[1].replace(/,/g, ''));
+      esQuery.query.bool.filter.push({
+        range: { amount: { gte: amount } }
+      });
+    }
+
+    const amountBelow = lowerQuery.match(/(?:below|under|less than)\s+\$?(\d+(?:,\d{3})*(?:\.\d{2})?)/);
+    if (amountBelow) {
+      const amount = parseFloat(amountBelow[1].replace(/,/g, ''));
+      esQuery.query.bool.filter.push({
+        range: { amount: { lte: amount } }
+      });
+    }
+
+    const amountRange = lowerQuery.match(/between\s+\$?(\d+(?:,\d{3})*(?:\.\d{2})?)\s+and\s+\$?(\d+(?:,\d{3})*(?:\.\d{2})?)/);
+    if (amountRange) {
+      const minAmount = parseFloat(amountRange[1].replace(/,/g, ''));
+      const maxAmount = parseFloat(amountRange[2].replace(/,/g, ''));
+      esQuery.query.bool.filter.push({
+        range: { amount: { gte: minAmount, lte: maxAmount } }
+      });
+    }
+
+    // Risk level filtering
+    if (lowerQuery.includes('high risk') || lowerQuery.includes('risky')) {
+      esQuery.query.bool.filter.push({ term: { riskLevel: 'high' } });
+    } else if (lowerQuery.includes('medium risk')) {
+      esQuery.query.bool.filter.push({ term: { riskLevel: 'medium' } });
+    } else if (lowerQuery.includes('low risk') || lowerQuery.includes('safe')) {
+      esQuery.query.bool.filter.push({ term: { riskLevel: 'low' } });
+    }
+
+    // If no specific filters, add a general search
+    if (esQuery.query.bool.must.length === 0 && esQuery.query.bool.filter.length === 0 && esQuery.query.bool.should.length === 0) {
+      esQuery.query.bool.must.push({
+        multi_match: {
+          query: query,
+          fields: ['customerName^2', 'loanType', 'loanPurpose', 'customerEmail', 'applicationId'],
+          fuzziness: 'AUTO'
+        }
+      });
+    }
+
+    return esQuery;
+  }
+
   // Enhanced query processing for natural language questions
   private parseNaturalLanguageQuery(query: string): {
     intent: string;
@@ -239,29 +358,113 @@ export class RAGService {
     context: any[];
   }> {
     try {
-      // Parse the query to understand intent
-      const { intent, filters, parameters } = this.parseNaturalLanguageQuery(userQuery);
+      console.log('🤖 Processing chatbot query:', userQuery);
       
-      // Get smart results based on query using improved Elasticsearch search
-      const relevantLoans = await this.searchLoanApplications(userQuery, filters, 10);
-      const relevantDocs = await this.searchRelevantDocuments(userQuery, 3);
-
-      // Generate contextual response based on intent and results
-      const response = await this.generateContextualResponse(userQuery, intent, relevantLoans, relevantDocs, parameters);
-
+      // Step 1: Convert natural language to Elasticsearch query
+      const esQuery = this.buildElasticsearchQuery(userQuery);
+      console.log('📊 Generated Elasticsearch query:', JSON.stringify(esQuery, null, 2));
+      
+      // Step 2: Execute Elasticsearch query on loan applications index
+      const searchResults = await this.executeElasticsearchQuery(esQuery);
+      console.log(`🔍 Found ${searchResults.length} loan applications`);
+      
+      // Step 3: Generate context summary for AI model
+      const contextSummary = this.generateContextSummary(searchResults, userQuery);
+      console.log('📋 Context summary generated for AI processing');
+      
+      // Step 4: Send query + context to AI model for final response
+      const aiResponse = await this.generateAIResponseFromContext(userQuery, searchResults, contextSummary);
+      console.log('🎯 AI response generated successfully');
+      
       return {
-        response,
-        context: [...relevantLoans, ...relevantDocs]
+        response: aiResponse,
+        context: searchResults.map(result => ({
+          id: result.id || result.applicationId,
+          source: result,
+          score: 1.0
+        }))
       };
     } catch (error) {
-      console.error('Failed to generate RAG response:', error);
-      // Enhanced fallback with better error handling
+      console.error('❌ Error in generateRAGResponse:', error);
       const fallbackResponse = this.generateFallbackResponse(userQuery);
       return {
         response: fallbackResponse,
         context: []
       };
     }
+  }
+
+  // Enhanced AI response generation with context
+  private async generateAIResponseFromContext(query: string, searchResults: any[], contextSummary: string): Promise<string> {
+    try {
+      const systemPrompt = `You are an AI assistant for ElastiBank's loan management system. You help loan officers and customers with comprehensive loan-related queries.
+
+You have access to real-time loan application data from Elasticsearch. Analyze the query and provide accurate, helpful responses based on the actual data provided.
+
+Context Summary:
+${contextSummary}
+
+Sample Applications:
+${searchResults.slice(0, 5).map(app => `- ${app.applicationId}: ${app.customerName} - ${app.loanType} loan for $${app.amount?.toLocaleString()} (${app.status}) - Risk: ${app.riskLevel}`).join('\n')}
+
+Guidelines:
+- Provide accurate, specific information based on the loan data provided
+- For loan listings, format them clearly with bullet points or numbered lists
+- For count queries, provide exact numbers from the data
+- For amount ranges, show formatted currency values
+- Be conversational but professional
+- Reference specific loan applications by customer name and application ID when relevant
+- Focus on being helpful and informative about loan status, amounts, types, customer information, and risk levels
+- Always base responses on the actual data provided in the context`;
+
+      const response = await openai.generateResponse(query, [systemPrompt]);
+      return response;
+    } catch (openaiError) {
+      console.warn('🟡 OpenAI unavailable, using intelligent fallback');
+      return this.generateIntelligentFallbackFromResults(query, searchResults);
+    }
+  }
+
+  // Intelligent fallback based on search results
+  private generateIntelligentFallbackFromResults(query: string, searchResults: any[]): string {
+    const lowerQuery = query.toLowerCase();
+
+    if (searchResults.length === 0) {
+      return `I couldn't find any loan applications matching "${query}". Try searching for specific customer names, loan types (personal, mortgage, auto, business, student), status (pending, approved, rejected), or amount ranges.`;
+    }
+
+    // Count queries
+    if (lowerQuery.includes('how many') || lowerQuery.includes('count') || lowerQuery.includes('total')) {
+      const statusBreakdown = this.getStatusBreakdown(searchResults);
+      let countResponse = `I found ${searchResults.length} loan applications matching your query.`;
+      
+      if (Object.keys(statusBreakdown).length > 1) {
+        const statusText = Object.entries(statusBreakdown)
+          .map(([status, count]) => `${count} ${status}`)
+          .join(', ');
+        countResponse += ` Breakdown: ${statusText}.`;
+      }
+      
+      return countResponse;
+    }
+
+    // List queries
+    if (lowerQuery.includes('show') || lowerQuery.includes('list') || lowerQuery.includes('find')) {
+      const applicationList = searchResults.slice(0, 10).map((app, index) => 
+        `${index + 1}. ${app.customerName} (${app.applicationId}) - ${app.loanType} loan for $${app.amount?.toLocaleString()} - Status: ${app.status} - Risk: ${app.riskLevel}`
+      ).join('\n');
+
+      let prefix = 'Here are the loan applications I found:\n\n';
+      if (searchResults.length > 10) {
+        prefix += `Showing top 10 of ${searchResults.length} results:\n\n`;
+      }
+
+      return prefix + applicationList;
+    }
+
+    // General response
+    const summary = this.generateContextSummary(searchResults, query);
+    return `I found ${searchResults.length} loan applications. Here's a summary:\n\n${summary}`;
   }
 
   private async generateContextualResponse(

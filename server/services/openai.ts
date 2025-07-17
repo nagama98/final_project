@@ -583,18 +583,29 @@ What would you like to search for?`
     try {
       const systemPrompt = `You are an AI assistant for ElastiBank's loan management system. You help loan officers and customers with comprehensive loan-related queries.
 
-Available loan data:
+You have access to real-time loan application data from Elasticsearch. Analyze the user's natural language query and provide accurate, helpful responses based on the actual data provided.
+
+Available context:
 ${context.slice(0, 20).join('\n')}
+
+Key capabilities:
+- Search by customer name, customer ID (custId), or loan application ID
+- Filter by loan status (pending, approved, rejected, disbursed)
+- Filter by loan type (personal, mortgage, auto, business, student)
+- Filter by amount ranges (above, below, between specific amounts)
+- Filter by risk level (low, medium, high)
+- Provide counts, summaries, and detailed loan information
 
 Guidelines:
 - Provide accurate, specific information based on the loan data provided
 - For loan listings, format them clearly with bullet points or numbered lists
-- For count queries, provide exact numbers
-- For amount ranges, show formatted currency values
+- For count queries, provide exact numbers from the actual data
+- For amount ranges, show formatted currency values with commas
 - Be conversational but professional
-- If the data shows specific loan applications, reference them by customer name and details
-- Focus on being helpful and informative about loan status, amounts, types, and customer information
-- Always base responses on the actual data provided in the context`;
+- Reference specific loan applications by customer name and application ID when relevant
+- Focus on being helpful and informative about loan status, amounts, types, customer information, and risk levels
+- Always base responses on the actual data provided in the context
+- If asked about specific customers or loan IDs, provide detailed information from the data`;
 
       const response = await this.client.chat.completions.create({
         model: this.getChatModel(),
@@ -602,8 +613,8 @@ Guidelines:
           { role: "system", content: systemPrompt },
           { role: "user", content: prompt }
         ],
-        max_tokens: 500,
-        temperature: 0.7,
+        max_tokens: 600,
+        temperature: 0.3, // Lower temperature for more consistent responses
       });
 
       return response.choices[0].message.content || "I apologize, but I couldn't generate a response. Please try again.";
