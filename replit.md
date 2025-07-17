@@ -122,8 +122,9 @@ The system requires several environment variables:
 - ✓ Successfully completed migration from Replit Agent to Replit environment
 - ✓ Removed Tools tab from sidebar navigation as requested
 - ✓ Removed Settings tab from sidebar navigation as requested
-- ✓ Cleaned up unused imports in sidebar component (Calculator, TrendingUp, Bot, Database, Settings, Shield)
-- ✓ Simplified sidebar to show only: Dashboard, Applications, New Application, Customers, Documents
+- ✓ Removed New Application tab from sidebar navigation as requested
+- ✓ Cleaned up unused imports in sidebar component (Calculator, TrendingUp, Bot, Database, Settings, Shield, Plus)
+- ✓ Simplified sidebar to show only: Dashboard, Applications, Customers, Documents
 - ✓ Updated new application form logic to use modal dialog instead of separate page
 - ✓ Integrated new application form directly into applications page
 - ✓ Removed separate /new-application route and page component

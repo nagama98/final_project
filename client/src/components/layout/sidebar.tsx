@@ -2,8 +2,7 @@ import {
   BarChart3, 
   FileText, 
   Users, 
-  FolderOpen, 
-  Plus
+  FolderOpen
 } from "lucide-react";
 import { useLocation } from "wouter";
 
@@ -16,7 +15,6 @@ export default function Sidebar() {
       items: [
         { name: "Dashboard", icon: BarChart3, href: "/dashboard" },
         { name: "Applications", icon: FileText, href: "/applications" },
-        { name: "New Application", icon: Plus, href: "/applications/new" },
         { name: "Customers", icon: Users, href: "/customers" },
         { name: "Documents", icon: FolderOpen, href: "/documents" },
       ]
