@@ -146,7 +146,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           collateral: { type: 'keyword' },
           description: { 
             type: 'text',
-            analyzer: 'standard'
+            analyzer: 'standard',
+            fields: {
+              semantic: {
+                type: 'text',
+                analyzer: 'english',
+                fielddata: true
+              }
+            }
           },
           documents: { type: 'text' },
           notes: { type: 'text' },

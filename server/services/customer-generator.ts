@@ -3,24 +3,29 @@ import { elasticsearchStorage } from "../storage-elasticsearch";
 
 export class CustomerGeneratorService {
   private firstNames = [
-    'James', 'Mary', 'John', 'Patricia', 'Robert', 'Jennifer', 'Michael', 'Linda',
-    'William', 'Elizabeth', 'David', 'Barbara', 'Richard', 'Susan', 'Joseph', 'Jessica',
-    'Thomas', 'Sarah', 'Christopher', 'Karen', 'Charles', 'Nancy', 'Daniel', 'Lisa',
-    'Matthew', 'Betty', 'Anthony', 'Helen', 'Mark', 'Sandra', 'Donald', 'Donna',
-    'Paul', 'Carol', 'Joshua', 'Ruth', 'Kenneth', 'Sharon', 'Kevin', 'Michelle',
-    'Brian', 'Laura', 'George', 'Sarah', 'Timothy', 'Kimberly', 'Ronald', 'Deborah',
-    'Jason', 'Dorothy', 'Edward', 'Lisa', 'Jeffrey', 'Nancy', 'Ryan', 'Karen',
-    'Jacob', 'Betty', 'Gary', 'Helen', 'Nicholas', 'Sandra', 'Eric', 'Donna'
+    'Alexander', 'Sophia', 'Benjamin', 'Isabella', 'Christopher', 'Emma', 'Daniel', 'Olivia',
+    'Ethan', 'Ava', 'Gabriel', 'Mia', 'Henry', 'Charlotte', 'Isaac', 'Amelia',
+    'Jackson', 'Harper', 'Liam', 'Evelyn', 'Mason', 'Abigail', 'Nathan', 'Emily',
+    'Owen', 'Elizabeth', 'Sebastian', 'Mila', 'Theodore', 'Ella', 'William', 'Avery',
+    'Aiden', 'Sofia', 'Caleb', 'Camila', 'David', 'Aria', 'Eli', 'Scarlett',
+    'Felix', 'Victoria', 'Gavin', 'Madison', 'Hunter', 'Luna', 'Ian', 'Grace',
+    'Jasper', 'Chloe', 'Knox', 'Penelope', 'Leo', 'Layla', 'Miles', 'Riley',
+    'Nolan', 'Zoey', 'Oliver', 'Nora', 'Parker', 'Lily', 'Quinn', 'Eleanor',
+    'Ryan', 'Hannah', 'Samuel', 'Lillian', 'Tyler', 'Addison', 'Vincent', 'Aubrey',
+    'Wyatt', 'Ellie', 'Xavier', 'Stella', 'Zoe', 'Natalie', 'Adrian', 'Zara'
   ];
 
   private lastNames = [
-    'Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis',
-    'Rodriguez', 'Martinez', 'Hernandez', 'Lopez', 'Gonzalez', 'Wilson', 'Anderson', 'Thomas',
-    'Taylor', 'Moore', 'Jackson', 'Martin', 'Lee', 'Perez', 'Thompson', 'White',
-    'Harris', 'Sanchez', 'Clark', 'Ramirez', 'Lewis', 'Robinson', 'Walker', 'Young',
-    'Allen', 'King', 'Wright', 'Scott', 'Torres', 'Nguyen', 'Hill', 'Flores',
-    'Green', 'Adams', 'Nelson', 'Baker', 'Hall', 'Rivera', 'Campbell', 'Mitchell',
-    'Carter', 'Roberts', 'Gomez', 'Phillips', 'Evans', 'Turner', 'Diaz', 'Parker'
+    'Anderson', 'Bennett', 'Carter', 'Davidson', 'Edwards', 'Foster', 'Griffin', 'Harrison',
+    'Ibrahim', 'Johnson', 'Kumar', 'Lancaster', 'Morrison', 'Nielsen', 'O\'Connor', 'Peterson',
+    'Quinn', 'Richardson', 'Sullivan', 'Thompson', 'Underwood', 'Valencia', 'Washington', 'Xavier',
+    'Young', 'Zhang', 'Abbott', 'Brooks', 'Collins', 'Douglas', 'Elliott', 'Ferguson',
+    'Gardner', 'Hughes', 'Jenkins', 'Kelly', 'Lopez', 'Murphy', 'Nelson', 'Oliver',
+    'Palmer', 'Roberts', 'Stewart', 'Turner', 'Vaughn', 'Watson', 'Adams', 'Baker',
+    'Campbell', 'Davis', 'Evans', 'Fisher', 'Green', 'Hall', 'Jackson', 'King',
+    'Lewis', 'Martin', 'Parker', 'Reed', 'Scott', 'Taylor', 'Walker', 'White',
+    'Bell', 'Cooper', 'Gray', 'Hill', 'Lee', 'Moore', 'Price', 'Ross',
+    'Stone', 'Wood', 'Barnes', 'Clark', 'Cook', 'Cox', 'Diaz', 'Long'
   ];
 
   private addresses = [
