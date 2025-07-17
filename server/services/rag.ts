@@ -166,13 +166,13 @@ export class RAGService {
 
     // Amount-based queries
     const amountMatches = lowerQuery.match(/above|over|more than|greater than\s+\$?(\d+(?:,\d{3})*(?:\.\d{2})?)/);
-    if (amountMatches) {
+    if (amountMatches && amountMatches[1]) {
       result.intent = 'amount_filter';
       result.parameters.minAmount = parseFloat(amountMatches[1].replace(/,/g, ''));
     }
 
     const belowMatches = lowerQuery.match(/below|under|less than\s+\$?(\d+(?:,\d{3})*(?:\.\d{2})?)/);
-    if (belowMatches) {
+    if (belowMatches && belowMatches[1]) {
       result.intent = 'amount_filter';
       result.parameters.maxAmount = parseFloat(belowMatches[1].replace(/,/g, ''));
     }
