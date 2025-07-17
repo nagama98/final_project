@@ -213,13 +213,28 @@ export class ElasticsearchStorage implements IStorage {
 
   async getCustomerWithStats(customerId: string): Promise<any> {
     try {
-      const customer = await elasticsearch.getDocument('customers', customerId);
+      // Try to find customer by custId first
+      const customerResponse = await elasticsearch.search('customers', {
+        query: {
+          term: { custId: customerId }
+        },
+        size: 1
+      });
+      
+      let customer;
+      if (customerResponse.hits.hits.length > 0) {
+        customer = customerResponse.hits.hits[0]._source;
+      } else {
+        // Fallback to direct document lookup
+        customer = await elasticsearch.getDocument('customers', customerId);
+      }
+      
       if (!customer) return null;
 
-      // Get loan applications for this customer
+      // Get loan applications for this customer using custId
       const response = await elasticsearch.search('loan_applications', {
         query: {
-          term: { customerId: customerId }
+          term: { custId: customer.custId }
         },
         size: 100
       });
@@ -251,8 +266,18 @@ export class ElasticsearchStorage implements IStorage {
 
   async updateCustomerStats(customerId: string): Promise<void> {
     try {
-      const customer = await elasticsearch.getDocument('customers', customerId);
-      if (!customer) return;
+      // Find customer by custId
+      const customerResponse = await elasticsearch.search('customers', {
+        query: {
+          term: { custId: customerId }
+        },
+        size: 1
+      });
+      
+      if (customerResponse.hits.hits.length === 0) return;
+      
+      const customer = customerResponse.hits.hits[0]._source;
+      const documentId = customerResponse.hits.hits[0]._id;
 
       const stats = await this.getCustomerWithStats(customerId);
       if (!stats) return;
@@ -261,10 +286,11 @@ export class ElasticsearchStorage implements IStorage {
         ...customer,
         totalLoans: stats.totalLoans,
         totalAmount: stats.totalAmount,
-        activeLoans: stats.activeLoans
+        activeLoans: stats.activeLoans,
+        updatedAt: new Date().toISOString()
       };
 
-      await elasticsearch.updateDocument('customers', customerId, updatedCustomer);
+      await elasticsearch.updateDocument('customers', documentId, updatedCustomer);
     } catch (error) {
       console.error('Failed to update customer stats:', error);
     }

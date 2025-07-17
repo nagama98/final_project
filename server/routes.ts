@@ -6,6 +6,7 @@ import { elasticsearch } from "./services/elasticsearch";
 // RAG service removed - using OpenAI directly
 import { openai } from "./services/openai";
 import { dataGenerator } from "./services/data-generator";
+import { customerGenerator } from "./services/customer-generator";
 import { insertLoanApplicationSchema, insertDocumentSchema, insertChatMessageSchema } from "@shared/schema";
 import { fixCustomerData } from "./fix-customer-data";
 import multer from "multer";
@@ -60,11 +61,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (applications.length < 100) {
-        console.log('Generating initial loan application data...');
+        console.log('Generating initial customer and loan application data...');
+        await customerGenerator.generateCustomers(5000);
         await dataGenerator.generateLoanApplications(10000);
+        await customerGenerator.updateLoanApplicationsWithCustomers();
+        await customerGenerator.updateCustomerStats();
         console.log('Initial data generation completed');
       } else {
         console.log(`Found ${applications.length} existing applications, skipping data generation`);
+        // Check if we need to generate customers
+        try {
+          const customers = await elasticsearchStorage.getAllCustomers();
+          if (customers.length < 100) {
+            console.log('Generating customer data and updating correlations...');
+            await customerGenerator.generateCustomers(5000);
+            await customerGenerator.updateLoanApplicationsWithCustomers();
+            await customerGenerator.updateCustomerStats();
+            console.log('Customer data generation completed');
+          }
+        } catch (error) {
+          console.log('Customer index not found, generating customer data...');
+          await customerGenerator.generateCustomers(5000);
+          await customerGenerator.updateLoanApplicationsWithCustomers();
+          await customerGenerator.updateCustomerStats();
+        }
       }
     } catch (error) {
       console.error('Failed to generate initial data:', error);
@@ -367,6 +387,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const allUsers = await storage.getAllLoanApplications(); // Using applications to get user data
         customers = allUsers.map(app => ({
           id: app.customerId,
+          custId: app.custId || app.customerId,
           firstName: app.customerName?.split(' ')[0] || 'Unknown',
           lastName: app.customerName?.split(' ')[1] || 'Customer',
           email: app.customerEmail || 'unknown@email.com',
@@ -378,7 +399,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }));
         // Remove duplicates
         customers = customers.filter((customer, index, self) => 
-          index === self.findIndex(c => c.id === customer.id)
+          index === self.findIndex(c => c.custId === customer.custId)
         );
       }
       

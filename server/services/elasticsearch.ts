@@ -113,6 +113,37 @@ export class ElasticsearchService {
     }
   }
 
+  async bulkIndex(indexName: string, documents: any[]): Promise<void> {
+    try {
+      if (documents.length === 0) return;
+
+      const body = [];
+      for (const doc of documents) {
+        // Index action
+        body.push({
+          index: {
+            _index: indexName,
+            _id: doc.id || doc.custId || doc.applicationId
+          }
+        });
+        // Document data
+        body.push(doc);
+      }
+
+      const response = await this.client.bulk({ body });
+      
+      if (response.errors) {
+        console.error('Bulk indexing had errors:', response.items);
+        throw new Error('Bulk indexing failed');
+      }
+      
+      console.log(`Successfully bulk indexed ${documents.length} documents to ${indexName}`);
+    } catch (error) {
+      console.error(`Failed to bulk index documents:`, error);
+      throw error;
+    }
+  }
+
   async hybridSearch(indexName: string, searchQuery: string, filters: any = {}): Promise<any> {
     try {
       // Use RRF (Reciprocal Rank Fusion) pattern for better search results
@@ -276,12 +307,41 @@ export class ElasticsearchService {
       }
     });
 
+    // Customers index
+    await this.createIndex('customers', {
+      properties: {
+        id: { type: 'keyword' },
+        custId: { type: 'keyword' },
+        username: { type: 'keyword' },
+        email: { type: 'keyword' },
+        role: { type: 'keyword' },
+        firstName: { type: 'text' },
+        lastName: { type: 'text' },
+        phone: { type: 'keyword' },
+        address: { type: 'text' },
+        dateOfBirth: { type: 'date' },
+        ssn: { type: 'keyword' },
+        employmentStatus: { type: 'keyword' },
+        annualIncome: { type: 'double' },
+        creditScore: { type: 'integer' },
+        riskLevel: { type: 'keyword' },
+        totalLoans: { type: 'integer' },
+        totalAmount: { type: 'double' },
+        activeLoans: { type: 'integer' },
+        createdAt: { type: 'date' },
+        updatedAt: { type: 'date' }
+      }
+    });
+
     // Loan applications index
     await this.createIndex('loan_applications', {
       properties: {
         id: { type: 'integer' },
         applicationId: { type: 'keyword' },
-        customerId: { type: 'integer' },
+        customerId: { type: 'keyword' },
+        custId: { type: 'keyword' },
+        customerName: { type: 'text' },
+        customerEmail: { type: 'keyword' },
         loanType: { type: 'keyword' },
         amount: { type: 'text' },
         term: { type: 'integer' },

@@ -10,10 +10,16 @@ import { useQuery } from "@tanstack/react-query";
 
 interface Customer {
   id: string;
+  custId: string;
   firstName: string;
   lastName: string;
   email: string;
   phone?: string;
+  address?: string;
+  dateOfBirth?: string;
+  ssn?: string;
+  employmentStatus?: string;
+  annualIncome?: number;
   totalLoans: number;
   totalAmount: number;
   activeLoans: number;
@@ -207,7 +213,7 @@ export default function Customers() {
                         </Avatar>
                         <div>
                           <p className="font-medium">{customer.firstName} {customer.lastName}</p>
-                          <p className="text-sm text-gray-500">ID: {customer.id}</p>
+                          <p className="text-sm text-gray-500">ID: {customer.custId}</p>
                         </div>
                       </div>
                     </td>
