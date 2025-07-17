@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, FileText, Clock, Check, DollarSign } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import AdvancedSearch from "@/components/dashboard/advanced-search";
@@ -48,21 +48,6 @@ export default function Applications() {
 
   const handleApplicationSuccess = () => {
     setIsDialogOpen(false);
-  };
-
-  // Calculate summary statistics
-  const stats = applications ? {
-    total: applications.length,
-    pending: applications.filter(app => app.status === 'pending').length,
-    approved: applications.filter(app => app.status === 'approved').length,
-    underReview: applications.filter(app => app.status === 'under_review').length,
-    totalAmount: applications.reduce((sum, app) => sum + parseInt(app.amount), 0)
-  } : {
-    total: 0,
-    pending: 0,
-    approved: 0,
-    underReview: 0,
-    totalAmount: 0
   };
 
   if (isLoading) {
@@ -117,65 +102,6 @@ export default function Applications() {
             <LoanApplicationForm onSuccess={handleApplicationSuccess} />
           </DialogContent>
         </Dialog>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Applications</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-              </div>
-              <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <FileText className="h-6 w-6 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Under Review</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.underReview}</p>
-              </div>
-              <div className="h-12 w-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <Clock className="h-6 w-6 text-yellow-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Approved</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.approved}</p>
-              </div>
-              <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <Check className="h-6 w-6 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Amount</p>
-                <p className="text-2xl font-bold text-gray-900">${stats.totalAmount.toLocaleString()}</p>
-              </div>
-              <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-purple-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Advanced Search */}
