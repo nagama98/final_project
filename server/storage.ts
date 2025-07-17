@@ -22,6 +22,11 @@ export interface IStorage {
   getChatMessage(id: number): Promise<ChatMessage | undefined>;
   getChatMessagesByUser(userId: number): Promise<ChatMessage[]>;
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
+  
+  // Customer methods
+  getAllCustomers?(): Promise<any[]>;
+  getCustomerWithStats?(customerId: string): Promise<any>;
+  updateCustomerStats?(customerId: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {

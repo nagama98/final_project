@@ -85,6 +85,27 @@ export class ElasticsearchStorage implements IStorage {
 
     try {
       await elasticsearch.indexDocument('users', id.toString(), user);
+      
+      // Also index in customers index if it's a customer
+      if (user.role === 'customer') {
+        const customerDoc = {
+          id: id.toString(),
+          username: user.username,
+          email: user.email,
+          role: user.role,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          phone: user.phone,
+          createdAt: user.createdAt.toISOString(),
+          totalLoans: 0,
+          totalAmount: 0,
+          activeLoans: 0,
+          creditScore: 750, // Default credit score
+          riskLevel: 'medium'
+        };
+        await elasticsearch.indexDocument('customers', id.toString(), customerDoc);
+      }
+      
       return user;
     } catch (error) {
       console.error('Failed to create user:', error);
@@ -138,6 +159,10 @@ export class ElasticsearchStorage implements IStorage {
 
     try {
       await elasticsearch.indexDocument('loan_applications', id.toString(), application);
+      
+      // Update customer stats after creating loan application
+      await this.updateCustomerStats(insertApplication.customerId.toString());
+      
       console.log(`Created loan application ${id} in Elasticsearch`);
       return application;
     } catch (error) {
@@ -173,6 +198,75 @@ export class ElasticsearchStorage implements IStorage {
     } catch (error) {
       console.error('Failed to get all loan applications:', error);
       return [];
+    }
+  }
+
+  // Customer methods
+  async getAllCustomers(): Promise<any[]> {
+    try {
+      return await elasticsearch.getAllDocuments('customers', 10000);
+    } catch (error) {
+      console.error('Failed to get all customers:', error);
+      return [];
+    }
+  }
+
+  async getCustomerWithStats(customerId: string): Promise<any> {
+    try {
+      const customer = await elasticsearch.getDocument('customers', customerId);
+      if (!customer) return null;
+
+      // Get loan applications for this customer
+      const response = await elasticsearch.search('loan_applications', {
+        query: {
+          term: { customerId: customerId }
+        },
+        size: 100
+      });
+      
+      const loans = response.hits.hits.map((hit: any) => ({
+        id: hit._id,
+        ...hit._source
+      }));
+
+      // Calculate stats
+      const totalLoans = loans.length;
+      const totalAmount = loans.reduce((sum, loan) => sum + parseFloat(loan.amount || 0), 0);
+      const activeLoans = loans.filter(loan => 
+        loan.status === 'approved' || loan.status === 'disbursed'
+      ).length;
+
+      return {
+        ...customer,
+        totalLoans,
+        totalAmount,
+        activeLoans,
+        recentLoans: loans.slice(0, 5)
+      };
+    } catch (error) {
+      console.error('Failed to get customer with stats:', error);
+      return null;
+    }
+  }
+
+  async updateCustomerStats(customerId: string): Promise<void> {
+    try {
+      const customer = await elasticsearch.getDocument('customers', customerId);
+      if (!customer) return;
+
+      const stats = await this.getCustomerWithStats(customerId);
+      if (!stats) return;
+
+      const updatedCustomer = {
+        ...customer,
+        totalLoans: stats.totalLoans,
+        totalAmount: stats.totalAmount,
+        activeLoans: stats.activeLoans
+      };
+
+      await elasticsearch.updateDocument('customers', customerId, updatedCustomer);
+    } catch (error) {
+      console.error('Failed to update customer stats:', error);
     }
   }
 

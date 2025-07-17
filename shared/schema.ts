@@ -85,9 +85,26 @@ export type ChatMessage = typeof chatMessages.$inferSelect;
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 
 // Elasticsearch document types
+export type CustomerESDocument = {
+  id: string;
+  username: string;
+  email: string;
+  role: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  createdAt: string;
+  totalLoans: number;
+  totalAmount: number;
+  activeLoans: number;
+  creditScore?: number;
+  riskLevel?: string;
+};
+
 export type LoanApplicationESDocument = {
   id: string;
   applicationId: string;
+  customerId: string;
   customerName: string;
   customerEmail: string;
   loanType: string;

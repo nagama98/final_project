@@ -353,6 +353,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Customer routes
+  app.get("/api/customers", async (req, res) => {
+    try {
+      // Try to get customers from Elasticsearch first, fallback to memory storage
+      let customers;
+      try {
+        customers = await elasticsearchStorage.getAllCustomers();
+        console.log(`Retrieved ${customers.length} customers from Elasticsearch`);
+      } catch (error) {
+        console.warn('Elasticsearch failed for customers, using memory storage:', error);
+        // Get users with role 'customer' from memory storage
+        const allUsers = await storage.getAllLoanApplications(); // Using applications to get user data
+        customers = allUsers.map(app => ({
+          id: app.customerId,
+          firstName: app.customerName?.split(' ')[0] || 'Unknown',
+          lastName: app.customerName?.split(' ')[1] || 'Customer',
+          email: app.customerEmail || 'unknown@email.com',
+          totalLoans: 1,
+          totalAmount: parseFloat(app.amount || '0'),
+          activeLoans: app.status === 'approved' || app.status === 'disbursed' ? 1 : 0,
+          creditScore: app.riskScore || 750,
+          riskLevel: app.riskScore && app.riskScore > 700 ? 'low' : app.riskScore && app.riskScore > 600 ? 'medium' : 'high'
+        }));
+        // Remove duplicates
+        customers = customers.filter((customer, index, self) => 
+          index === self.findIndex(c => c.id === customer.id)
+        );
+      }
+      
+      res.json(customers);
+    } catch (error) {
+      console.error('Failed to fetch customers:', error);
+      res.status(500).json({ error: "Failed to fetch customers" });
+    }
+  });
+
+  app.get("/api/customers/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Try to get customer with stats from Elasticsearch first
+      let customer;
+      try {
+        customer = await elasticsearchStorage.getCustomerWithStats(id);
+      } catch (error) {
+        console.warn('Elasticsearch failed for customer details, using memory storage:', error);
+        // Fallback to memory storage
+        const user = await storage.getUser(parseInt(id));
+        const loans = await storage.getLoanApplicationsByCustomer(parseInt(id));
+        
+        if (user) {
+          customer = {
+            ...user,
+            totalLoans: loans.length,
+            totalAmount: loans.reduce((sum, loan) => sum + parseFloat(loan.amount || '0'), 0),
+            activeLoans: loans.filter(loan => loan.status === 'approved' || loan.status === 'disbursed').length,
+            creditScore: 750,
+            riskLevel: 'medium',
+            recentLoans: loans.slice(0, 5)
+          };
+        }
+      }
+      
+      if (!customer) {
+        return res.status(404).json({ error: "Customer not found" });
+      }
+      
+      res.json(customer);
+    } catch (error) {
+      console.error('Failed to fetch customer:', error);
+      res.status(500).json({ error: "Failed to fetch customer" });
+    }
+  });
+
   // Chat with OpenAI for natural language processing
   app.post("/api/chat", async (req, res) => {
     try {

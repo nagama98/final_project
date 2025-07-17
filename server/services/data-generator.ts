@@ -26,6 +26,10 @@ export class DataGeneratorService {
     return `${firstName} ${lastName}`;
   }
 
+  private getRandomElement<T>(array: T[]): T {
+    return array[Math.floor(Math.random() * array.length)];
+  }
+
   private generateRandomEmail(name: string): string {
     const cleanName = name.toLowerCase().replace(/\s+/g, '.');
     const domains = ['gmail.com', 'yahoo.com', 'outlook.com', 'company.com', 'email.com'];
