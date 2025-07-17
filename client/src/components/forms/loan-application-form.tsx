@@ -54,8 +54,14 @@ export default function LoanApplicationForm({ onSuccess }: LoanApplicationFormPr
 
   const createApplicationMutation = useMutation({
     mutationFn: async (data: LoanApplicationFormData) => {
+      // Generate a unique customer ID for this application
+      const timestamp = Date.now().toString(36);
+      const random = Math.random().toString(36).substr(2, 5);
+      const custId = `CUST-${timestamp}-${random}`.toUpperCase();
+      
       const applicationData = {
-        customerId: 1, // Would be from authenticated user
+        customerId: custId,
+        custId: custId,
         applicationId: `LA-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`,
         ...data,
         status: 'pending',
