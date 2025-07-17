@@ -70,8 +70,7 @@ export class ElasticsearchService {
       const response = await this.client.search({
         index: indexName,
         query: { match_all: {} },
-        size: size,
-        sort: [{ createdAt: { order: 'desc' } }]
+        size: size
       });
       return response.hits.hits.map((hit: any) => ({
         id: hit._id,

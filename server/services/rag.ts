@@ -1,6 +1,7 @@
 import { elasticsearch } from './elasticsearch.js';
 import { openai } from './openai.js';
 import { storage } from '../storage.js';
+import { elasticsearchStorage } from '../storage-elasticsearch.js';
 
 export class RAGService {
   // Convert natural language to Elasticsearch query
@@ -360,13 +361,13 @@ export class RAGService {
     try {
       console.log('🤖 Processing chatbot query:', userQuery);
       
-      // Step 1: Convert natural language to Elasticsearch query
-      const esQuery = this.buildElasticsearchQuery(userQuery);
-      console.log('📊 Generated Elasticsearch query:', JSON.stringify(esQuery, null, 2));
+      // Step 1: Parse natural language query to understand intent
+      const parsedQuery = this.parseNaturalLanguageQuery(userQuery);
+      console.log('🔍 Parsed query intent:', parsedQuery.intent);
       
-      // Step 2: Execute Elasticsearch query on loan applications index
-      const searchResults = await this.executeElasticsearchQuery(esQuery);
-      console.log(`🔍 Found ${searchResults.length} loan applications`);
+      // Step 2: Get loan applications from Elasticsearch storage directly
+      const searchResults = await this.executeDirectElasticsearchSearch(parsedQuery);
+      console.log(`📊 Found ${searchResults.length} loan applications`);
       
       // Step 3: Generate context summary for AI model
       const contextSummary = this.generateContextSummary(searchResults, userQuery);
@@ -391,6 +392,69 @@ export class RAGService {
         response: fallbackResponse,
         context: []
       };
+    }
+  }
+
+  // Direct Elasticsearch search using the actual data store
+  private async executeDirectElasticsearchSearch(parsedQuery: any): Promise<any[]> {
+    try {
+      console.log('🔍 NEW METHOD: executeDirectElasticsearchSearch called');
+      // Get all applications from Elasticsearch storage
+      const allApplications = await elasticsearchStorage.getAllLoanApplications();
+      console.log(`📈 Retrieved ${allApplications.length} total applications from Elasticsearch`);
+      
+      let filteredApplications = allApplications;
+      
+      // Apply filters based on parsed query
+      if (parsedQuery.intent === 'status_filter' && parsedQuery.filters.status) {
+        filteredApplications = filteredApplications.filter(app => 
+          app.status.toLowerCase() === parsedQuery.filters.status.toLowerCase()
+        );
+      }
+      
+      if (parsedQuery.intent === 'loan_type_filter' && parsedQuery.filters.loanType) {
+        filteredApplications = filteredApplications.filter(app => 
+          app.loanType.toLowerCase() === parsedQuery.filters.loanType.toLowerCase()
+        );
+      }
+      
+      if (parsedQuery.intent === 'amount_filter') {
+        if (parsedQuery.parameters.minAmount !== undefined) {
+          filteredApplications = filteredApplications.filter(app => 
+            parseFloat(app.amount) >= parsedQuery.parameters.minAmount
+          );
+        }
+        if (parsedQuery.parameters.maxAmount !== undefined) {
+          filteredApplications = filteredApplications.filter(app => 
+            parseFloat(app.amount) <= parsedQuery.parameters.maxAmount
+          );
+        }
+      }
+      
+      if (parsedQuery.intent === 'customer_filter' && parsedQuery.parameters.customerName) {
+        filteredApplications = filteredApplications.filter(app => 
+          app.customerName?.toLowerCase().includes(parsedQuery.parameters.customerName.toLowerCase())
+        );
+      }
+      
+      if (parsedQuery.intent === 'risk_filter') {
+        if (parsedQuery.parameters.minRiskScore !== undefined) {
+          filteredApplications = filteredApplications.filter(app => 
+            app.riskScore >= parsedQuery.parameters.minRiskScore
+          );
+        }
+        if (parsedQuery.parameters.maxRiskScore !== undefined) {
+          filteredApplications = filteredApplications.filter(app => 
+            app.riskScore <= parsedQuery.parameters.maxRiskScore
+          );
+        }
+      }
+      
+      console.log(`🎯 Filtered to ${filteredApplications.length} applications based on query`);
+      return filteredApplications.slice(0, 50); // Limit results
+    } catch (error) {
+      console.error('Direct Elasticsearch search failed:', error);
+      return [];
     }
   }
 
@@ -470,10 +534,7 @@ Guidelines:
   // Execute Elasticsearch query on loan applications index
   private async executeElasticsearchQuery(esQuery: any): Promise<any[]> {
     try {
-      const response = await elasticsearch.search({
-        index: 'loan_applications',
-        body: esQuery
-      });
+      const response = await elasticsearch.search('loan_applications', esQuery);
       
       return response.hits.hits.map((hit: any) => hit._source);
     } catch (error) {
@@ -487,11 +548,47 @@ Guidelines:
   private async fallbackStorageSearch(esQuery: any): Promise<any[]> {
     try {
       const allApplications = await storage.getAllLoanApplications();
-      // Simple filtering based on the query structure
-      return allApplications.filter(app => {
-        // Basic filtering logic for fallback
-        return true; // Return all for now, can be enhanced
-      }).slice(0, 100);
+      
+      // Extract filters from the esQuery structure
+      let filteredApps = allApplications;
+      
+      // Apply filters based on the query structure
+      if (esQuery.query?.bool?.filter?.length > 0) {
+        for (const filter of esQuery.query.bool.filter) {
+          if (filter.term?.status) {
+            filteredApps = filteredApps.filter(app => app.status === filter.term.status);
+          }
+          if (filter.term?.loanType) {
+            filteredApps = filteredApps.filter(app => app.loanType === filter.term.loanType);
+          }
+          if (filter.range?.amount) {
+            const range = filter.range.amount;
+            if (range.gte !== undefined) {
+              filteredApps = filteredApps.filter(app => parseFloat(app.amount) >= range.gte);
+            }
+            if (range.lte !== undefined) {
+              filteredApps = filteredApps.filter(app => parseFloat(app.amount) <= range.lte);
+            }
+          }
+        }
+      }
+      
+      // Apply text search if multi_match query exists
+      if (esQuery.query?.bool?.must?.length > 0) {
+        for (const must of esQuery.query.bool.must) {
+          if (must.multi_match) {
+            const searchText = must.multi_match.query.toLowerCase();
+            filteredApps = filteredApps.filter(app => 
+              app.customerName?.toLowerCase().includes(searchText) ||
+              app.loanType?.toLowerCase().includes(searchText) ||
+              app.applicationId?.toLowerCase().includes(searchText) ||
+              app.status?.toLowerCase().includes(searchText)
+            );
+          }
+        }
+      }
+      
+      return filteredApps.slice(0, 100);
     } catch (error) {
       console.error('Fallback storage search failed:', error);
       return [];
