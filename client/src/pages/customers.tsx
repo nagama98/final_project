@@ -38,6 +38,9 @@ interface Customer {
 export default function Customers() {
   const [searchQuery, setSearchQuery] = useState("");
   const [riskFilter, setRiskFilter] = useState("all");
+  const [creditScoreFilter, setCreditScoreFilter] = useState("all");
+  const [employmentFilter, setEmploymentFilter] = useState("all");
+  const [loanActivityFilter, setLoanActivityFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
@@ -49,11 +52,26 @@ export default function Customers() {
     const matchesSearch = searchQuery === "" || 
       customer.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       customer.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      customer.email.toLowerCase().includes(searchQuery.toLowerCase());
+      customer.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      customer.custId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      customer.phone?.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesRisk = riskFilter === "all" || customer.riskLevel === riskFilter;
     
-    return matchesSearch && matchesRisk;
+    const matchesCreditScore = creditScoreFilter === "all" || 
+      (creditScoreFilter === "excellent" && customer.creditScore >= 750) ||
+      (creditScoreFilter === "good" && customer.creditScore >= 700 && customer.creditScore < 750) ||
+      (creditScoreFilter === "fair" && customer.creditScore >= 650 && customer.creditScore < 700) ||
+      (creditScoreFilter === "poor" && customer.creditScore < 650);
+    
+    const matchesEmployment = employmentFilter === "all" || customer.employmentStatus === employmentFilter;
+    
+    const matchesLoanActivity = loanActivityFilter === "all" ||
+      (loanActivityFilter === "active" && customer.activeLoans > 0) ||
+      (loanActivityFilter === "inactive" && customer.activeLoans === 0) ||
+      (loanActivityFilter === "high-value" && customer.totalAmount > 100000);
+    
+    return matchesSearch && matchesRisk && matchesCreditScore && matchesEmployment && matchesLoanActivity;
   }) || [];
 
   const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage);
@@ -155,37 +173,112 @@ export default function Customers() {
         </Card>
       </div>
 
-      {/* Search and Filters */}
-      <Card className="mb-8">
+      {/* Advanced Search and Filter Controls */}
+      <Card className="mb-8 w-full">
         <CardHeader>
-          <CardTitle>Search & Filter Customers</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Search customers by name or email..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={riskFilter} onValueChange={setRiskFilter}>
-              <SelectTrigger className="w-full md:w-48">
-                <SelectValue placeholder="Filter by risk" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Risk Levels</SelectItem>
-                <SelectItem value="low">Low Risk</SelectItem>
-                <SelectItem value="medium">Medium Risk</SelectItem>
-                <SelectItem value="high">High Risk</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline">
-              <Download className="mr-2 h-4 w-4" />
-              Export
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg font-semibold">Customer Search & Filters</CardTitle>
+            <Button variant="outline" size="sm" onClick={() => {
+              setSearchQuery("");
+              setRiskFilter("all");
+              setCreditScoreFilter("all");
+              setEmploymentFilter("all");
+              setLoanActivityFilter("all");
+              setCurrentPage(1);
+            }}>
+              <Search className="mr-2 h-4 w-4" />
+              Reset
             </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Search Bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Input
+              placeholder="Search customers by name, email, customer ID, or phone..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 w-full"
+            />
+          </div>
+          
+          {/* Filter Controls */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Risk Level</label>
+              <Select value={riskFilter} onValueChange={setRiskFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Risk Levels" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Risk Levels</SelectItem>
+                  <SelectItem value="low">Low Risk</SelectItem>
+                  <SelectItem value="medium">Medium Risk</SelectItem>
+                  <SelectItem value="high">High Risk</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Credit Score Range</label>
+              <Select value={creditScoreFilter} onValueChange={setCreditScoreFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Scores" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Scores</SelectItem>
+                  <SelectItem value="excellent">Excellent (750+)</SelectItem>
+                  <SelectItem value="good">Good (700-749)</SelectItem>
+                  <SelectItem value="fair">Fair (650-699)</SelectItem>
+                  <SelectItem value="poor">Poor (&lt; 650)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Employment Status</label>
+              <Select value={employmentFilter} onValueChange={setEmploymentFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Employment" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Employment</SelectItem>
+                  <SelectItem value="employed">Employed</SelectItem>
+                  <SelectItem value="self-employed">Self-Employed</SelectItem>
+                  <SelectItem value="unemployed">Unemployed</SelectItem>
+                  <SelectItem value="retired">Retired</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Loan Activity</label>
+              <Select value={loanActivityFilter} onValueChange={setLoanActivityFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Customers" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Customers</SelectItem>
+                  <SelectItem value="active">Has Active Loans</SelectItem>
+                  <SelectItem value="inactive">No Active Loans</SelectItem>
+                  <SelectItem value="high-value">High Value (&gt;$100k)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          {/* Action Buttons */}
+          <div className="flex justify-between items-center pt-4 border-t">
+            <div className="text-sm text-gray-600">
+              Showing {paginatedCustomers.length} of {filteredCustomers.length} customers
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" size="sm">
+                <Download className="mr-2 h-4 w-4" />
+                Export Results
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
