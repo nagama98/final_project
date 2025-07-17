@@ -3,8 +3,6 @@ import {
   FileText, 
   Users, 
   FolderOpen, 
-  Settings, 
-  Shield,
   Plus
 } from "lucide-react";
 import { useLocation } from "wouter";
@@ -21,13 +19,6 @@ export default function Sidebar() {
         { name: "New Application", icon: Plus, href: "/applications/new" },
         { name: "Customers", icon: Users, href: "/customers" },
         { name: "Documents", icon: FolderOpen, href: "/documents" },
-      ]
-    },
-    {
-      title: "Settings",
-      items: [
-        { name: "Configuration", icon: Settings, href: "/settings" },
-        { name: "Security", icon: Shield, href: "/security" },
       ]
     }
   ];
