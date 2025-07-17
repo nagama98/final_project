@@ -118,6 +118,23 @@ The system requires several environment variables:
 
 ## Recent Changes (July 17, 2025)
 
+### Data Generation Updates (July 17, 2025)
+- ✓ Updated data generation logic to create exactly 100 customers with 1000 loan applications each
+- ✓ Enhanced customer generator to create proper customer-loan correlation using custId field
+- ✓ Implemented comprehensive loan application generation with realistic data distribution
+- ✓ Added loan type-specific amount ranges (personal: $1k-$50k, mortgage: $50k-$800k, etc.)
+- ✓ Created loan type-specific term ranges (personal: 1-5 years, mortgage: 5-30 years, etc.)
+- ✓ Added realistic loan purposes based on loan type (debt consolidation, home purchase, etc.)
+- ✓ Implemented credit score-based interest rate calculation
+- ✓ Added batch processing for efficient Elasticsearch indexing
+- ✓ Created customer statistics calculation with loan portfolio metrics
+- ✓ Added data clearing functionality to reset existing data
+- ✓ Implemented progress tracking for data generation process
+- ✓ Added /api/generate-data endpoint for manual data regeneration
+- ✓ Fixed schema validation to handle both string and number customerId formats
+- ✓ Enhanced New Application form functionality with proper validation
+- ✓ Total data structure: 100 customers × 1000 loans = 100,000 loan applications
+
 ### UI Improvements (July 17, 2025)
 - ✓ Successfully completed migration from Replit Agent to Replit environment
 - ✓ Removed Tools tab from sidebar navigation as requested

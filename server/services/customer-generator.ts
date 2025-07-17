@@ -105,45 +105,25 @@ export class CustomerGeneratorService {
     return customer;
   }
 
-  async generateCustomers(count: number = 5000): Promise<void> {
+  async generateCustomers(count: number = 100): Promise<any[]> {
     console.log(`🏦 Starting generation of ${count} customers...`);
     
-    const batchSize = 100;
-    const totalBatches = Math.ceil(count / batchSize);
-    let processedCount = 0;
-
-    for (let batch = 0; batch < totalBatches; batch++) {
-      const batchStart = batch * batchSize;
-      const batchEnd = Math.min(batchStart + batchSize, count);
-      const batchCount = batchEnd - batchStart;
-
-      const customers = [];
-      
-      for (let i = 0; i < batchCount; i++) {
-        const customer = await this.generateCustomer(batchStart + i + 1);
-        customers.push(customer);
-      }
-
-      // Bulk index customers in Elasticsearch
-      try {
-        await elasticsearch.bulkIndex('customers', customers);
-        processedCount += batchCount;
-        
-        if (batch % 10 === 0 || batch === totalBatches - 1) {
-          const progress = ((batch + 1) / totalBatches * 100).toFixed(1);
-          console.log(`👥 Customer Progress: ${progress}% (${processedCount}/${count})`);
-        }
-      } catch (error) {
-        console.error('Failed to index customer batch:', error);
-      }
-
-      // Small delay to prevent overwhelming
-      if (batch % 20 === 0 && batch > 0) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
+    const customers = [];
+    
+    for (let i = 0; i < count; i++) {
+      const customer = await this.generateCustomer(i + 1);
+      customers.push(customer);
     }
 
-    console.log(`✅ Successfully generated ${processedCount} customers!`);
+    // Bulk index customers in Elasticsearch
+    try {
+      await elasticsearch.bulkIndex('customers', customers);
+      console.log(`✅ Successfully generated and indexed ${customers.length} customers!`);
+    } catch (error) {
+      console.error('Failed to index customers:', error);
+    }
+
+    return customers;
   }
 
   async updateLoanApplicationsWithCustomers(): Promise<void> {
@@ -214,75 +194,215 @@ export class CustomerGeneratorService {
     }
   }
 
-  async updateCustomerStats(): Promise<void> {
-    console.log('📊 Updating customer statistics...');
+  async generateLoanApplicationsForCustomers(customers: any[], loansPerCustomer: number = 1000): Promise<void> {
+    console.log(`💰 Starting generation of ${loansPerCustomer} loan applications for each of ${customers.length} customers...`);
     
-    try {
-      const customers = await elasticsearch.getAllDocuments('customers', 10000);
-      const batchSize = 50;
-      const totalBatches = Math.ceil(customers.length / batchSize);
-      let processedCount = 0;
-
-      for (let batch = 0; batch < totalBatches; batch++) {
-        const batchStart = batch * batchSize;
-        const batchEnd = Math.min(batchStart + batchSize, customers.length);
-        const batchCustomers = customers.slice(batchStart, batchEnd);
-
-        const updates = [];
+    const loanTypes = ['personal', 'mortgage', 'auto', 'business', 'student'];
+    const statuses = ['pending', 'under_review', 'approved', 'rejected', 'disbursed'];
+    
+    const batchSize = 200;
+    let totalApplications = 0;
+    
+    for (let customerIndex = 0; customerIndex < customers.length; customerIndex++) {
+      const customer = customers[customerIndex];
+      const applications = [];
+      
+      // Generate applications for this customer
+      for (let loanIndex = 0; loanIndex < loansPerCustomer; loanIndex++) {
+        const loanType = loanTypes[Math.floor(Math.random() * loanTypes.length)];
+        const applicationId = `LA-${new Date().getFullYear()}-${String(totalApplications + loanIndex + 1).padStart(6, '0')}`;
         
-        for (const customer of batchCustomers) {
-          try {
-            // Get loan applications for this customer
-            const response = await elasticsearch.search('loan_applications', {
-              query: {
-                term: { custId: customer.custId }
-              },
-              size: 1000
-            });
-            
-            const loans = response.hits.hits.map((hit: any) => hit._source);
-            
-            // Calculate stats
-            const totalLoans = loans.length;
-            const totalAmount = loans.reduce((sum, loan) => sum + parseFloat(loan.amount || 0), 0);
-            const activeLoans = loans.filter(loan => 
-              loan.status === 'approved' || loan.status === 'disbursed'
-            ).length;
-
-            const updatedCustomer = {
-              ...customer,
-              totalLoans,
-              totalAmount,
-              activeLoans,
-              updatedAt: new Date().toISOString()
-            };
-
-            updates.push(updatedCustomer);
-          } catch (error) {
-            console.error(`Failed to update stats for customer ${customer.custId}:`, error);
-          }
-        }
-
-        // Bulk update customers
-        if (updates.length > 0) {
-          try {
-            await elasticsearch.bulkIndex('customers', updates);
-            processedCount += updates.length;
-            
-            if (batch % 10 === 0 || batch === totalBatches - 1) {
-              const progress = ((batch + 1) / totalBatches * 100).toFixed(1);
-              console.log(`📈 Stats Progress: ${progress}% (${processedCount}/${customers.length})`);
-            }
-          } catch (error) {
-            console.error('Failed to update customer stats batch:', error);
-          }
+        const application = {
+          id: (totalApplications + loanIndex + 1).toString(),
+          applicationId,
+          customerId: customer.custId,
+          custId: customer.custId,
+          customerName: `${customer.firstName} ${customer.lastName}`,
+          customerEmail: customer.email,
+          loanType,
+          amount: this.generateRandomAmount(loanType),
+          term: this.generateRandomTerm(loanType),
+          status: statuses[Math.floor(Math.random() * statuses.length)],
+          riskScore: Math.floor(Math.random() * 100) + 1,
+          purpose: this.generateLoanPurpose(loanType),
+          income: (customer.annualIncome || 50000).toString(),
+          creditScore: customer.creditScore || 700,
+          collateral: loanType === 'mortgage' || loanType === 'auto' ? 'Yes' : 'No',
+          notes: `Application for ${customer.firstName} ${customer.lastName}`,
+          documents: [],
+          interestRate: this.generateInterestRate(loanType, customer.creditScore || 700),
+          createdAt: this.generateRandomDate(365).toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        
+        applications.push(application);
+        
+        // Batch insert when we reach batch size
+        if (applications.length >= batchSize) {
+          await this.insertApplicationBatch(applications);
+          applications.length = 0; // Clear array
         }
       }
-
-      console.log(`✅ Successfully updated stats for ${processedCount} customers!`);
-    } catch (error) {
-      console.error('Failed to update customer stats:', error);
+      
+      // Insert remaining applications for this customer
+      if (applications.length > 0) {
+        await this.insertApplicationBatch(applications);
+      }
+      
+      totalApplications += loansPerCustomer;
+      
+      // Progress logging
+      if ((customerIndex + 1) % 10 === 0 || customerIndex === customers.length - 1) {
+        const progress = ((customerIndex + 1) / customers.length * 100).toFixed(1);
+        console.log(`📊 Customer Progress: ${progress}% (${customerIndex + 1}/${customers.length} customers, ${totalApplications} total loans)`);
+      }
     }
+    
+    console.log(`✅ Successfully generated ${totalApplications} loan applications for ${customers.length} customers!`);
+    
+    // Update customer statistics
+    await this.updateCustomerStats(customers);
+  }
+
+  private generateRandomAmount(loanType: string): string {
+    let min, max;
+    switch (loanType) {
+      case 'personal': min = 1000; max = 50000; break;
+      case 'mortgage': min = 50000; max = 800000; break;
+      case 'auto': min = 10000; max = 80000; break;
+      case 'business': min = 5000; max = 500000; break;
+      case 'student': min = 2000; max = 100000; break;
+      default: min = 1000; max = 50000;
+    }
+    return (Math.floor(Math.random() * (max - min + 1)) + min).toString();
+  }
+
+  private generateRandomTerm(loanType: string): number {
+    switch (loanType) {
+      case 'personal': return Math.floor(Math.random() * 5) + 1; // 1-5 years
+      case 'mortgage': return Math.floor(Math.random() * 25) + 5; // 5-30 years
+      case 'auto': return Math.floor(Math.random() * 6) + 2; // 2-7 years
+      case 'business': return Math.floor(Math.random() * 8) + 2; // 2-10 years
+      case 'student': return Math.floor(Math.random() * 10) + 1; // 1-10 years
+      default: return 5;
+    }
+  }
+
+  private generateLoanPurpose(loanType: string): string {
+    const purposes = {
+      personal: ['Debt consolidation', 'Home improvement', 'Medical expenses', 'Vacation', 'Wedding'],
+      mortgage: ['Primary residence', 'Investment property', 'Refinancing', 'Second home'],
+      auto: ['New car purchase', 'Used car purchase', 'Refinancing existing auto loan'],
+      business: ['Equipment purchase', 'Working capital', 'Business expansion', 'Inventory financing'],
+      student: ['Tuition fees', 'Books and supplies', 'Room and board', 'Educational expenses']
+    };
+    
+    const purposeList = purposes[loanType as keyof typeof purposes] || purposes.personal;
+    return purposeList[Math.floor(Math.random() * purposeList.length)];
+  }
+
+  private generateInterestRate(loanType: string, creditScore: number): string {
+    let baseRate;
+    switch (loanType) {
+      case 'personal': baseRate = 12; break;
+      case 'mortgage': baseRate = 6; break;
+      case 'auto': baseRate = 8; break;
+      case 'business': baseRate = 10; break;
+      case 'student': baseRate = 5; break;
+      default: baseRate = 10;
+    }
+    
+    // Adjust based on credit score
+    const adjustment = creditScore > 750 ? -2 : creditScore > 650 ? -1 : creditScore < 600 ? 3 : 0;
+    const finalRate = Math.max(baseRate + adjustment + (Math.random() * 2 - 1), 2);
+    
+    return finalRate.toFixed(2);
+  }
+
+  private async insertApplicationBatch(applications: any[]): Promise<void> {
+    try {
+      await elasticsearch.bulkIndex('loan_applications', applications);
+    } catch (error) {
+      console.error('Failed to insert application batch:', error);
+    }
+  }
+
+  private async updateCustomerStats(customers: any[]): Promise<void> {
+    console.log('📊 Updating customer statistics...');
+    
+    const updatedCustomers = [];
+    
+    for (const customer of customers) {
+      try {
+        // Get loan applications for this customer
+        const response = await elasticsearch.search('loan_applications', {
+          query: {
+            term: { custId: customer.custId }
+          },
+          size: 10000
+        });
+        
+        const loans = response.hits.hits.map((hit: any) => hit._source);
+        
+        // Calculate stats
+        const totalLoans = loans.length;
+        const totalAmount = loans.reduce((sum, loan) => sum + parseFloat(loan.amount || 0), 0);
+        const activeLoans = loans.filter(loan => 
+          loan.status === 'approved' || loan.status === 'disbursed'
+        ).length;
+
+        const updatedCustomer = {
+          ...customer,
+          totalLoans,
+          totalAmount,
+          activeLoans,
+          updatedAt: new Date().toISOString()
+        };
+
+        updatedCustomers.push(updatedCustomer);
+      } catch (error) {
+        console.error(`Failed to update stats for customer ${customer.custId}:`, error);
+      }
+    }
+
+    // Bulk update customers
+    if (updatedCustomers.length > 0) {
+      try {
+        await elasticsearch.bulkIndex('customers', updatedCustomers);
+        console.log(`✅ Successfully updated stats for ${updatedCustomers.length} customers!`);
+      } catch (error) {
+        console.error('Failed to update customer stats:', error);
+      }
+    }
+  }
+
+  async clearExistingData(): Promise<void> {
+    console.log('🧹 Clearing existing data...');
+    try {
+      await elasticsearch.deleteIndex('customers');
+      await elasticsearch.deleteIndex('loan_applications');
+      await elasticsearch.initializeIndices();
+      console.log('✅ Existing data cleared successfully!');
+    } catch (error) {
+      console.error('Failed to clear existing data:', error);
+    }
+  }
+
+  async generateCustomersAndLoans(customerCount: number = 100, loansPerCustomer: number = 1000): Promise<void> {
+    const totalLoanCount = customerCount * loansPerCustomer;
+    console.log(`🚀 Starting generation of ${customerCount} customers with ${loansPerCustomer} loans each (${totalLoanCount} total applications)...`);
+    
+    // Clear existing data
+    await this.clearExistingData();
+    
+    // Generate customers first
+    const customers = await this.generateCustomers(customerCount);
+    console.log(`✅ Generated ${customers.length} customers`);
+    
+    // Generate loan applications for each customer
+    await this.generateLoanApplicationsForCustomers(customers, loansPerCustomer);
+    
+    console.log(`🎉 Successfully generated ${customerCount} customers and ${totalLoanCount} loan applications with proper correlation!`);
   }
 }
 

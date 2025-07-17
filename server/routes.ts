@@ -63,29 +63,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (applications.length < 100) {
         console.log('Generating initial customer and loan application data...');
-        await customerGenerator.generateCustomers(5000);
-        await dataGenerator.generateLoanApplications(10000);
-        await customerGenerator.updateLoanApplicationsWithCustomers();
-        await customerGenerator.updateCustomerStats();
+        // Generate 100 customers with 1000 loan applications each
+        await customerGenerator.generateCustomersAndLoans(100, 1000);
         console.log('Initial data generation completed');
       } else {
         console.log(`Found ${applications.length} existing applications, skipping data generation`);
-        // Check if we need to generate customers
-        try {
-          const customers = await elasticsearchStorage.getAllCustomers();
-          if (customers.length < 100) {
-            console.log('Generating customer data and updating correlations...');
-            await customerGenerator.generateCustomers(5000);
-            await customerGenerator.updateLoanApplicationsWithCustomers();
-            await customerGenerator.updateCustomerStats();
-            console.log('Customer data generation completed');
-          }
-        } catch (error) {
-          console.log('Customer index not found, generating customer data...');
-          await customerGenerator.generateCustomers(5000);
-          await customerGenerator.updateLoanApplicationsWithCustomers();
-          await customerGenerator.updateCustomerStats();
-        }
       }
     } catch (error) {
       console.error('Failed to generate initial data:', error);
@@ -114,6 +96,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Failed to fix customer data:", error);
       res.status(500).json({ error: "Failed to fix customer data" });
+    }
+  });
+
+  // Generate new data endpoint
+  app.post("/api/generate-data", async (req, res) => {
+    try {
+      const { customers = 100, loansPerCustomer = 1000 } = req.body;
+      console.log(`Generating ${customers} customers with ${loansPerCustomer} loans each...`);
+      
+      await customerGenerator.generateCustomersAndLoans(customers, loansPerCustomer);
+      
+      res.json({ 
+        message: `Successfully generated ${customers} customers and ${customers * loansPerCustomer} loan applications`,
+        customers: customers,
+        loansPerCustomer: loansPerCustomer,
+        totalLoans: customers * loansPerCustomer
+      });
+    } catch (error) {
+      console.error("Failed to generate data:", error);
+      res.status(500).json({ error: "Failed to generate data" });
     }
   });
 
