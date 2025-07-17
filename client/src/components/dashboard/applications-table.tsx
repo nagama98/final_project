@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Filter, Download, Plus, Eye, Check, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Filter, Download, Eye, Check, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
 interface LoanApplication {
@@ -181,10 +181,6 @@ export default function ApplicationsTable({ filters }: ApplicationsTableProps) {
             </Button>
             <Button variant="ghost" size="icon">
               <Download className="h-4 w-4" />
-            </Button>
-            <Button className="bg-primary hover:bg-blue-700">
-              <Plus className="mr-2 h-4 w-4" />
-              New Application
             </Button>
           </div>
         </div>
