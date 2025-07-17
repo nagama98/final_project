@@ -3,8 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, RotateCcw, Save, X } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Search, RotateCcw, Save, X, Calendar as CalendarIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface SearchFilters {
   loanType: string;
@@ -12,6 +16,8 @@ interface SearchFilters {
   amountRange: string;
   dateRange: string;
   searchQuery: string;
+  startDate?: Date;
+  endDate?: Date;
 }
 
 interface AdvancedSearchProps {
@@ -36,7 +42,9 @@ export default function AdvancedSearch({ onFiltersChange }: AdvancedSearchProps)
     status: "all",
     amountRange: "all",
     dateRange: "all",
-    searchQuery: ""
+    searchQuery: "",
+    startDate: undefined,
+    endDate: undefined
   });
   
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -90,6 +98,17 @@ export default function AdvancedSearch({ onFiltersChange }: AdvancedSearchProps)
     onFiltersChange(newFilters);
   };
 
+  const handleDateRangeChange = (startDate?: Date, endDate?: Date) => {
+    const newFilters = { 
+      ...searchFilters, 
+      startDate, 
+      endDate,
+      dateRange: startDate || endDate ? "custom" : "all"
+    };
+    setSearchFilters(newFilters);
+    onFiltersChange(newFilters);
+  };
+
   const handleSearchQueryChange = (value: string) => {
     const newFilters = { ...searchFilters, searchQuery: value };
     setSearchFilters(newFilters);
@@ -114,7 +133,9 @@ export default function AdvancedSearch({ onFiltersChange }: AdvancedSearchProps)
       status: "all",
       amountRange: "all",
       dateRange: "",
-      searchQuery: ""
+      searchQuery: "",
+      startDate: undefined,
+      endDate: undefined
     };
     setSearchFilters(resetFilters);
     onFiltersChange(resetFilters);
@@ -243,20 +264,53 @@ export default function AdvancedSearch({ onFiltersChange }: AdvancedSearchProps)
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Application Date</label>
-            <Select value={searchFilters.dateRange} onValueChange={(value) => handleFilterChange("dateRange", value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Dates" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Dates</SelectItem>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="week">Past Week</SelectItem>
-                <SelectItem value="month">Past Month</SelectItem>
-                <SelectItem value="quarter">Past Quarter</SelectItem>
-                <SelectItem value="year">Past Year</SelectItem>
-              </SelectContent>
-            </Select>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Application Date Range</label>
+            <div className="flex gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !searchFilters.startDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {searchFilters.startDate ? format(searchFilters.startDate, "PPP") : "Start date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={searchFilters.startDate}
+                    onSelect={(date) => handleDateRangeChange(date, searchFilters.endDate)}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !searchFilters.endDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {searchFilters.endDate ? format(searchFilters.endDate, "PPP") : "End date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={searchFilters.endDate}
+                    onSelect={(date) => handleDateRangeChange(searchFilters.startDate, date)}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
         </div>
 

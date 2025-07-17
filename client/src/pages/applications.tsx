@@ -14,6 +14,8 @@ interface SearchFilters {
   amountRange: string;
   dateRange: string;
   searchQuery: string;
+  startDate?: Date;
+  endDate?: Date;
 }
 
 interface LoanApplication {
@@ -34,7 +36,9 @@ export default function Applications() {
     status: "all",
     amountRange: "all",
     dateRange: "",
-    searchQuery: ""
+    searchQuery: "",
+    startDate: undefined,
+    endDate: undefined
   });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 

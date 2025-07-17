@@ -13,6 +13,8 @@ interface SearchFilters {
   amountRange: string;
   dateRange: string;
   searchQuery: string;
+  startDate?: Date;
+  endDate?: Date;
 }
 
 export default function Dashboard() {
@@ -21,7 +23,9 @@ export default function Dashboard() {
     status: "all",
     amountRange: "all",
     dateRange: "",
-    searchQuery: ""
+    searchQuery: "",
+    startDate: undefined,
+    endDate: undefined
   });
 
   const handleFiltersChange = (filters: SearchFilters) => {

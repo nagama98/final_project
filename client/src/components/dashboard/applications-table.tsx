@@ -24,6 +24,8 @@ interface SearchFilters {
   amountRange: string;
   dateRange: string;
   searchQuery: string;
+  startDate?: Date;
+  endDate?: Date;
 }
 
 interface ApplicationsTableProps {
@@ -71,28 +73,22 @@ export default function ApplicationsTable({ filters }: ApplicationsTableProps) {
         return false;
       }
       
-      // Filter by date range
-      if (filters.dateRange && filters.dateRange !== 'all') {
+      // Filter by date range (custom date picker)
+      if (filters.startDate || filters.endDate) {
         const appDate = new Date(app.createdAt);
-        const now = new Date();
-        const daysAgo = Math.floor((now.getTime() - appDate.getTime()) / (1000 * 60 * 60 * 24));
         
-        switch (filters.dateRange) {
-          case 'today':
-            if (daysAgo > 1) return false;
-            break;
-          case 'week':
-            if (daysAgo > 7) return false;
-            break;
-          case 'month':
-            if (daysAgo > 30) return false;
-            break;
-          case 'quarter':
-            if (daysAgo > 90) return false;
-            break;
-          case 'year':
-            if (daysAgo > 365) return false;
-            break;
+        // Filter by start date
+        if (filters.startDate) {
+          const startOfDay = new Date(filters.startDate);
+          startOfDay.setHours(0, 0, 0, 0);
+          if (appDate < startOfDay) return false;
+        }
+        
+        // Filter by end date
+        if (filters.endDate) {
+          const endOfDay = new Date(filters.endDate);
+          endOfDay.setHours(23, 59, 59, 999);
+          if (appDate > endOfDay) return false;
         }
       }
       
