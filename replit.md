@@ -124,10 +124,15 @@ The system requires several environment variables:
 - ✓ Removed Settings tab from sidebar navigation as requested
 - ✓ Removed New Application tab from sidebar navigation as requested
 - ✓ Removed New Application button from applications page as requested
+- ✓ Restored New Application button with enhanced Elasticsearch integration
+- ✓ Enhanced loan application form to generate unique customer IDs (custId format: CUST-XXXXX-XXXXX)
+- ✓ Updated customer page to display loan IDs in a dedicated column
+- ✓ Added recentLoans interface to Customer type with loan details
+- ✓ Enhanced customer API to include loan correlation data with applicationId, status, and amount
+- ✓ Implemented loan ID display showing up to 3 recent loans per customer with status indicators
+- ✓ Added proper error handling for customer loan data retrieval
 - ✓ Cleaned up unused imports in sidebar component (Calculator, TrendingUp, Bot, Database, Settings, Shield, Plus)
-- ✓ Cleaned up unused imports in applications page (Button, Plus, Dialog, LoanApplicationForm)
 - ✓ Simplified sidebar to show only: Dashboard, Applications, Customers, Documents
-- ✓ Simplified applications page to show only: Advanced Search, Applications Table
 - ✓ Updated new application form logic to use modal dialog instead of separate page
 - ✓ Integrated new application form directly into applications page
 - ✓ Removed separate /new-application route and page component

@@ -26,6 +26,13 @@ interface Customer {
   creditScore: number;
   riskLevel: string;
   createdAt: string;
+  recentLoans?: Array<{
+    id: string;
+    applicationId: string;
+    status: string;
+    amount: string;
+    loanType: string;
+  }>;
 }
 
 export default function Customers() {
@@ -200,6 +207,7 @@ export default function Customers() {
                   <th className="text-left p-4">Total Loans</th>
                   <th className="text-left p-4">Active Loans</th>
                   <th className="text-left p-4">Total Amount</th>
+                  <th className="text-left p-4">Loan IDs</th>
                   <th className="text-left p-4">Actions</th>
                 </tr>
               </thead>
@@ -239,6 +247,27 @@ export default function Customers() {
                     </td>
                     <td className="p-4">
                       <span className="font-medium">${customer.totalAmount.toLocaleString()}</span>
+                    </td>
+                    <td className="p-4">
+                      <div className="max-w-xs">
+                        {customer.recentLoans && customer.recentLoans.length > 0 ? (
+                          <div className="space-y-1">
+                            {customer.recentLoans.slice(0, 3).map((loan) => (
+                              <div key={loan.id} className="text-xs">
+                                <span className="font-mono text-blue-600">{loan.applicationId}</span>
+                                <span className="text-gray-500 ml-2">({loan.status})</span>
+                              </div>
+                            ))}
+                            {customer.recentLoans.length > 3 && (
+                              <div className="text-xs text-gray-500">
+                                +{customer.recentLoans.length - 3} more
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-500 text-sm">No loans</span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-4">
                       <Button variant="ghost" size="sm">

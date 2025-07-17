@@ -381,6 +381,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         customers = await elasticsearchStorage.getAllCustomers();
         console.log(`Retrieved ${customers.length} customers from Elasticsearch`);
+        
+        // Enrich each customer with recent loans data
+        const enrichedCustomers = await Promise.all(
+          customers.map(async (customer) => {
+            try {
+              const customerWithStats = await elasticsearchStorage.getCustomerWithStats(customer.custId);
+              return {
+                ...customer,
+                recentLoans: customerWithStats?.recentLoans || []
+              };
+            } catch (error) {
+              console.error(`Failed to get loans for customer ${customer.custId}:`, error);
+              return {
+                ...customer,
+                recentLoans: []
+              };
+            }
+          })
+        );
+        
+        customers = enrichedCustomers;
       } catch (error) {
         console.warn('Elasticsearch failed for customers, using memory storage:', error);
         // Get users with role 'customer' from memory storage
@@ -395,7 +416,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalAmount: parseFloat(app.amount || '0'),
           activeLoans: app.status === 'approved' || app.status === 'disbursed' ? 1 : 0,
           creditScore: app.riskScore || 750,
-          riskLevel: app.riskScore && app.riskScore > 700 ? 'low' : app.riskScore && app.riskScore > 600 ? 'medium' : 'high'
+          riskLevel: app.riskScore && app.riskScore > 700 ? 'low' : app.riskScore && app.riskScore > 600 ? 'medium' : 'high',
+          recentLoans: [{
+            id: app.id,
+            applicationId: app.applicationId,
+            status: app.status,
+            amount: app.amount,
+            loanType: app.loanType
+          }]
         }));
         // Remove duplicates
         customers = customers.filter((customer, index, self) => 
