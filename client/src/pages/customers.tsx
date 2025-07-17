@@ -84,7 +84,7 @@ export default function Customers() {
   }
 
   return (
-    <div>
+    <div className="w-full max-w-none">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Customers</h1>
         <p className="text-gray-600">Manage customer relationships and loan information</p>

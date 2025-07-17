@@ -159,7 +159,7 @@ export default function AdvancedSearch({ onFiltersChange }: AdvancedSearchProps)
   }, []);
 
   return (
-    <Card className="mb-8">
+    <Card className="mb-8 w-full">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-semibold">Advanced Search & Filters</CardTitle>

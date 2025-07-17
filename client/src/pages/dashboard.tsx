@@ -56,7 +56,7 @@ export default function Dashboard() {
   ];
 
   return (
-    <div>
+    <div className="w-full max-w-none">
       {/* Dashboard Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Loan Management Dashboard</h1>

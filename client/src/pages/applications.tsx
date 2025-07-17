@@ -60,7 +60,7 @@ export default function Applications() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="w-full max-w-none space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Loan Applications</h1>
         <p className="text-gray-600">Manage and track all loan applications</p>
