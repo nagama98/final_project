@@ -501,8 +501,8 @@ export class ElasticsearchService {
         creditScore: { type: 'integer' },
         collateral: { type: 'keyword' },
         description: { 
-          type: 'semantic_text',
-          inference_id: '.elser_model_2'
+          type: 'text',
+          analyzer: 'standard'
         },
         documents: { type: 'text' },
         notes: { type: 'text' },
