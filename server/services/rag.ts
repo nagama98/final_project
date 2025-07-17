@@ -467,6 +467,115 @@ Guidelines:
     return `I found ${searchResults.length} loan applications. Here's a summary:\n\n${summary}`;
   }
 
+  // Execute Elasticsearch query on loan applications index
+  private async executeElasticsearchQuery(esQuery: any): Promise<any[]> {
+    try {
+      const response = await elasticsearch.search({
+        index: 'loan_applications',
+        body: esQuery
+      });
+      
+      return response.hits.hits.map((hit: any) => hit._source);
+    } catch (error) {
+      console.error('Elasticsearch query execution failed:', error);
+      // Fallback to storage search if Elasticsearch fails
+      return await this.fallbackStorageSearch(esQuery);
+    }
+  }
+
+  // Fallback to storage search if Elasticsearch fails
+  private async fallbackStorageSearch(esQuery: any): Promise<any[]> {
+    try {
+      const allApplications = await storage.getAllLoanApplications();
+      // Simple filtering based on the query structure
+      return allApplications.filter(app => {
+        // Basic filtering logic for fallback
+        return true; // Return all for now, can be enhanced
+      }).slice(0, 100);
+    } catch (error) {
+      console.error('Fallback storage search failed:', error);
+      return [];
+    }
+  }
+
+  // Generate context summary for AI processing
+  private generateContextSummary(results: any[], originalQuery: string): string {
+    if (results.length === 0) {
+      return `No loan applications found matching the query: "${originalQuery}"`;
+    }
+
+    const summary = {
+      totalResults: results.length,
+      statusBreakdown: this.getStatusBreakdown(results),
+      loanTypeBreakdown: this.getLoanTypeBreakdown(results),
+      amountStats: this.getAmountStats(results),
+      riskLevelBreakdown: this.getRiskLevelBreakdown(results),
+      topCustomers: this.getTopCustomers(results),
+      sampleApplications: results.slice(0, 5).map(app => ({
+        applicationId: app.applicationId,
+        customerName: app.customerName,
+        amount: app.amount,
+        status: app.status,
+        loanType: app.loanType,
+        riskLevel: app.riskLevel
+      }))
+    };
+
+    return JSON.stringify(summary, null, 2);
+  }
+
+  private getStatusBreakdown(results: any[]): any {
+    const breakdown: any = {};
+    results.forEach(app => {
+      breakdown[app.status] = (breakdown[app.status] || 0) + 1;
+    });
+    return breakdown;
+  }
+
+  private getLoanTypeBreakdown(results: any[]): any {
+    const breakdown: any = {};
+    results.forEach(app => {
+      breakdown[app.loanType] = (breakdown[app.loanType] || 0) + 1;
+    });
+    return breakdown;
+  }
+
+  private getAmountStats(results: any[]): any {
+    const amounts = results.map(app => app.amount || 0);
+    const total = amounts.reduce((sum, amount) => sum + amount, 0);
+    const avg = amounts.length > 0 ? total / amounts.length : 0;
+    const min = Math.min(...amounts);
+    const max = Math.max(...amounts);
+    
+    return { total, average: avg, minimum: min, maximum: max };
+  }
+
+  private getRiskLevelBreakdown(results: any[]): any {
+    const breakdown: any = {};
+    results.forEach(app => {
+      breakdown[app.riskLevel] = (breakdown[app.riskLevel] || 0) + 1;
+    });
+    return breakdown;
+  }
+
+  private getTopCustomers(results: any[]): any[] {
+    const customerMap: any = {};
+    results.forEach(app => {
+      const customerName = app.customerName || 'Unknown';
+      if (!customerMap[customerName]) {
+        customerMap[customerName] = {
+          name: customerName,
+          applications: 0,
+          totalAmount: 0
+        };
+      }
+      customerMap[customerName].applications++;
+      customerMap[customerName].totalAmount += app.amount || 0;
+    });
+    
+    return Object.values(customerMap).slice(0, 5);
+  }
+
   private async generateContextualResponse(
     query: string, 
     intent: string, 

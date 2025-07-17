@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { elasticsearchStorage } from "./storage-elasticsearch";
 import { elasticsearch } from "./services/elasticsearch";
-// RAG service removed - using OpenAI directly
+import { rag } from "./services/rag";
 import { openai } from "./services/openai";
 import { dataGenerator } from "./services/data-generator";
 import { customerGenerator } from "./services/customer-generator";
