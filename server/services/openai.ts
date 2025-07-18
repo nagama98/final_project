@@ -1,5 +1,4 @@
 import OpenAI from "openai";
-import { storage } from '../storage.js';
 import { elasticsearchStorage } from '../storage-elasticsearch.js';
 
 export class OpenAIService {
@@ -377,7 +376,7 @@ I can also answer general questions about loan management processes.`
         console.log(`Retrieved ${allLoans.length} loans from Elasticsearch for fallback search`);
       } catch (esError) {
         console.warn('Elasticsearch failed, using memory storage:', esError);
-        allLoans = await storage.getAllLoanApplications();
+        allLoans = await elasticsearchStorage.getAllLoanApplications();
       }
       
       // Status-based queries
@@ -503,7 +502,7 @@ What would you like to search for?`
         console.log(`Retrieved ${allLoans.length} loans from Elasticsearch for search`);
       } catch (esError) {
         console.warn('Elasticsearch failed, using memory storage:', esError);
-        allLoans = await storage.getAllLoanApplications();
+        allLoans = await elasticsearchStorage.getAllLoanApplications();
       }
       
       let filteredLoans = allLoans;

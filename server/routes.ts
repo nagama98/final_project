@@ -1,15 +1,11 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
 import { elasticsearchStorage } from "./storage-elasticsearch";
 import { elasticsearch } from "./services/elasticsearch";
-import { rag } from "./services/rag";
 import { openai } from "./services/openai";
 import { semanticRAGService } from './services/semantic-rag';
-import { dataGenerator } from "./services/data-generator";
 import { customerGenerator } from "./services/customer-generator";
 import { insertLoanApplicationSchema, insertDocumentSchema, insertChatMessageSchema } from "@shared/schema";
-import { fixCustomerData } from "./fix-customer-data";
 import multer from "multer";
 import { z } from "zod";
 
@@ -59,7 +55,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         applications = await elasticsearchStorage.getAllLoanApplications();
       } catch (error) {
-        applications = await storage.getAllLoanApplications();
+        applications = await elasticsearchStorage.getAllLoanApplications();
       }
 
       if (applications.length < 100) {
@@ -185,11 +181,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         applications = await elasticsearchStorage.getAllLoanApplications();
         if (applications.length === 0) {
-          applications = await storage.getAllLoanApplications();
+          applications = await elasticsearchStorage.getAllLoanApplications();
         }
       } catch (error) {
         console.warn('Elasticsearch failed for metrics, using memory storage:', error);
-        applications = await storage.getAllLoanApplications();
+        applications = await elasticsearchStorage.getAllLoanApplications();
       }
       
       const totalApplications = applications.length;
@@ -257,12 +253,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           useElasticsearch = true;
           console.log(`Retrieved ${applications.length} applications from Elasticsearch`);
         } else {
-          applications = await storage.getAllLoanApplications();
+          applications = await elasticsearchStorage.getAllLoanApplications();
           console.log(`Fallback: Retrieved ${applications.length} applications from memory storage`);
         }
       } catch (error) {
         console.warn('Elasticsearch failed, using memory storage:', error);
-        applications = await storage.getAllLoanApplications();
+        applications = await elasticsearchStorage.getAllLoanApplications();
       }
       
       // Limit to max records first
@@ -285,7 +281,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           try {
             customer = useElasticsearch ? 
               await elasticsearchStorage.getUser(app.customerId) : 
-              await storage.getUser(app.customerId);
+              await elasticsearchStorage.getUser(app.customerId);
           } catch (error) {
             console.warn(`Invalid user ID: ${app.customerId}`);
             customer = null;
@@ -328,14 +324,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/applications/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const application = await storage.getLoanApplication(parseInt(id));
+      const application = await elasticsearchStorage.getLoanApplication(parseInt(id));
       
       if (!application) {
         return res.status(404).json({ error: "Application not found" });
       }
 
-      const customer = await storage.getUser(application.customerId);
-      const documents = await storage.getDocumentsByApplication(application.id);
+      const customer = await elasticsearchStorage.getUser(application.customerId);
+      const documents = await elasticsearchStorage.getDocumentsByApplication(application.id);
 
       res.json({
         ...application,
@@ -372,7 +368,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Created application ${application.id} in Elasticsearch`);
       } catch (error) {
         console.warn('Failed to create in Elasticsearch, using memory storage:', error);
-        application = await storage.createLoanApplication(validatedData);
+        application = await elasticsearchStorage.createLoanApplication(validatedData);
       }
 
       res.status(201).json(application);
@@ -388,7 +384,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const updates = req.body;
       
-      const application = await storage.updateLoanApplication(parseInt(id), updates);
+      const application = await elasticsearchStorage.updateLoanApplication(parseInt(id), updates);
       
       // RAG re-indexing removed
 
@@ -411,7 +407,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // For now, we'll just simulate the document processing
       const mockExtractedText = `This is extracted text from ${req.file.originalname}`;
       
-      const document = await storage.createDocument({
+      const document = await elasticsearchStorage.createDocument({
         applicationId: parseInt(applicationId),
         documentType,
         fileName: req.file.originalname,
@@ -440,7 +436,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/applications/:id/documents", async (req, res) => {
     try {
       const { id } = req.params;
-      const documents = await storage.getDocumentsByApplication(parseInt(id));
+      const documents = await elasticsearchStorage.getDocumentsByApplication(parseInt(id));
       res.json(documents);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch documents" });
@@ -479,7 +475,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (error) {
         console.warn('Elasticsearch failed for customers, using memory storage:', error);
         // Get users with role 'customer' from memory storage
-        const allUsers = await storage.getAllLoanApplications(); // Using applications to get user data
+        const allUsers = await elasticsearchStorage.getAllLoanApplications(); // Using applications to get user data
         customers = allUsers.map(app => ({
           id: app.customerId,
           custId: app.custId || app.customerId,
@@ -523,8 +519,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (error) {
         console.warn('Elasticsearch failed for customer details, using memory storage:', error);
         // Fallback to memory storage
-        const user = await storage.getUser(parseInt(id));
-        const loans = await storage.getLoanApplicationsByCustomer(parseInt(id));
+        const user = await elasticsearchStorage.getUser(parseInt(id));
+        const loans = await elasticsearchStorage.getLoanApplicationsByCustomer(parseInt(id));
         
         if (user) {
           customer = {
@@ -630,7 +626,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } catch (error) {
         console.warn('Failed to store chat in Elasticsearch, using memory storage:', error);
-        await storage.createChatMessage({
+        await elasticsearchStorage.createChatMessage({
           userId: userId || 1,
           message,
           response: result.response
@@ -656,7 +652,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/chat/:userId", async (req, res) => {
     try {
       const { userId } = req.params;
-      const messages = await storage.getChatMessagesByUser(parseInt(userId));
+      const messages = await elasticsearchStorage.getChatMessagesByUser(parseInt(userId));
       res.json(messages);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch chat history" });
@@ -729,7 +725,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Check data generation status
   app.get("/api/data-status", async (req, res) => {
     try {
-      const applications = await storage.getAllLoanApplications();
+      const applications = await elasticsearchStorage.getAllLoanApplications();
       res.json({
         totalApplications: applications.length,
         lastGenerated: applications.length > 0 ? applications[applications.length - 1].createdAt : null

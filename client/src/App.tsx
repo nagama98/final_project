@@ -5,8 +5,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Dashboard from "@/pages/dashboard";
 import Applications from "@/pages/applications";
-
-import DataManagement from "@/pages/data-management";
 import Customers from "@/pages/customers";
 import Documents from "@/pages/documents";
 import NotFound from "@/pages/not-found";
@@ -20,8 +18,6 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/applications" component={Applications} />
-
-      <Route path="/data-management" component={DataManagement} />
       <Route path="/customers" component={Customers} />
       <Route path="/documents" component={Documents} />
       <Route component={NotFound} />
