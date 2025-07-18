@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { elasticsearchStorage } from '../storage-elasticsearch.js';
 
 export class OpenAIService {
-  private client: OpenAI;
+  public client: OpenAI;
 
   constructor() {
     // Check if Azure OpenAI configuration is available
@@ -28,7 +28,7 @@ export class OpenAIService {
     }
   }
 
-  private getChatModel(): string {
+  public getChatModel(): string {
     // Use Azure deployment name if available, otherwise use standard OpenAI model
     if (this.isUsingAzure()) {
       return process.env.AZURE_OPENAI_DEPLOYMENT_NAME || "gpt-4o";

@@ -139,14 +139,20 @@ ${context}
 
   async generateResponse(userPrompt: string, question: string): Promise<string> {
     try {
-      const response = await openai.getChatCompletion([
-        { role: 'system', content: userPrompt },
-        { role: 'user', content: question }
-      ]);
+      // Use Azure OpenAI directly with the client
+      const response = await openai.client.chat.completions.create({
+        model: openai.getChatModel(),
+        messages: [
+          { role: 'system', content: userPrompt },
+          { role: 'user', content: question }
+        ],
+        temperature: 0.3,
+        max_tokens: 500
+      });
       
-      return response;
+      return response.choices[0].message.content || 'I apologize, but I could not generate a response.';
     } catch (error) {
-      console.error('OpenAI completion failed:', error);
+      console.error('Azure OpenAI completion failed:', error);
       
       // Provide intelligent fallback based on question content
       if (question.toLowerCase().includes('how many') || question.toLowerCase().includes('count')) {
