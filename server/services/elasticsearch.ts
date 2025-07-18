@@ -136,6 +136,26 @@ export class ElasticsearchService {
     }
   }
 
+  async indexExists(indexName: string): Promise<boolean> {
+    try {
+      const exists = await this.client.indices.exists({ index: indexName });
+      return exists;
+    } catch (error) {
+      console.error(`Failed to check if index ${indexName} exists:`, error);
+      return false;
+    }
+  }
+
+  async countDocuments(indexName: string): Promise<number> {
+    try {
+      const response = await this.client.count({ index: indexName });
+      return response.count;
+    } catch (error) {
+      console.error(`Failed to count documents in ${indexName}:`, error);
+      return 0;
+    }
+  }
+
   async bulkIndex(indexName: string, documents: any[]): Promise<void> {
     try {
       if (documents.length === 0) return;
@@ -500,16 +520,8 @@ export class ElasticsearchService {
         income: { type: 'text' },
         creditScore: { type: 'integer' },
         collateral: { type: 'keyword' },
-        description: { 
-          type: 'text',
-          analyzer: 'standard',
-          fields: {
-            semantic: {
-              type: 'text',
-              analyzer: 'english',
-              fielddata: true
-            }
-          }
+        description: {
+          type: 'semantic_text'
         },
         documents: { type: 'text' },
         notes: { type: 'text' },

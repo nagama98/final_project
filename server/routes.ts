@@ -140,16 +140,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           income: { type: 'text' },
           creditScore: { type: 'integer' },
           collateral: { type: 'keyword' },
-          description: { 
-            type: 'text',
-            analyzer: 'standard',
-            fields: {
-              semantic: {
-                type: 'text',
-                analyzer: 'english',
-                fielddata: true
-              }
-            }
+          description: {
+            type: 'semantic_text'
           },
           documents: { type: 'text' },
           notes: { type: 'text' },

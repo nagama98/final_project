@@ -134,6 +134,9 @@ The system requires several environment variables:
 - ✅ Removed chatMessage schema and related database operations
 - ✅ Cleaned up all chatbot imports and references from frontend and backend
 - ✅ Simplified architecture to focus on core loan management features only
+- ✅ Updated Elasticsearch mapping to use semantic_text for description field
+- ✅ Replaced complex text field with semantic sub-fields with simple semantic_text type
+- ✅ Applied mapping changes to both initialization and recreate-index endpoints
 
 ### Unique Customer Names for Loan Applications (July 17, 2025)
 - ✅ Updated loan application generation to create unique customer names for each application
