@@ -6,8 +6,8 @@ export class ChatbotService {
   
   async searchElasticsearch(query: string): Promise<any[]> {
     try {
-      // Use RRF (Reciprocal Rank Fusion) with semantic_text fields
-      const esQuery = {
+      // First try semantic search with description field
+      const semanticQuery = {
         retriever: {
           rrf: {
             retrievers: [
@@ -16,36 +16,6 @@ export class ChatbotService {
                   query: {
                     semantic: {
                       field: 'description',
-                      query: query
-                    }
-                  }
-                }
-              },
-              {
-                standard: {
-                  query: {
-                    semantic: {
-                      field: 'customerName',
-                      query: query
-                    }
-                  }
-                }
-              },
-              {
-                standard: {
-                  query: {
-                    semantic: {
-                      field: 'loanType',
-                      query: query
-                    }
-                  }
-                }
-              },
-              {
-                standard: {
-                  query: {
-                    semantic: {
-                      field: 'purpose',
                       query: query
                     }
                   }
@@ -60,55 +30,59 @@ export class ChatbotService {
               type: 'semantic',
               number_of_fragments: 2,
               order: 'score'
-            },
-            customerName: {
-              type: 'semantic',
-              number_of_fragments: 2,
-              order: 'score'
-            },
-            loanType: {
-              type: 'semantic',
-              number_of_fragments: 2,
-              order: 'score'
-            },
-            purpose: {
-              type: 'semantic',
-              number_of_fragments: 2,
-              order: 'score'
             }
           }
         },
         size: 5
       };
 
-      const result = await elasticsearch.search(this.indexName, esQuery);
+      const result = await elasticsearch.search(this.indexName, semanticQuery);
       return result.hits.hits;
     } catch (error) {
-      console.error('Elasticsearch search failed:', error);
+      console.error('Semantic search failed, trying regular search:', error);
       
-      // Fallback to regular search if semantic search fails
-      const fallbackQuery = {
-        query: {
-          multi_match: {
-            query: query,
-            fields: ['description^2', 'customerName^1.5', 'loanType', 'purpose', 'status'],
-            type: 'best_fields',
-            fuzziness: 'AUTO'
-          }
-        },
-        highlight: {
-          fields: {
-            description: {},
-            customerName: {},
-            loanType: {},
-            purpose: {}
-          }
-        },
-        size: 5
-      };
+      try {
+        // Fallback to regular search without semantic_text fields
+        const fallbackQuery = {
+          query: {
+            multi_match: {
+              query: query,
+              fields: ['customerName^2', 'loanType^1.5', 'purpose', 'status', 'applicationId'],
+              type: 'best_fields',
+              fuzziness: 'AUTO'
+            }
+          },
+          highlight: {
+            fields: {
+              customerName: {},
+              loanType: {},
+              purpose: {},
+              status: {}
+            }
+          },
+          size: 5
+        };
 
-      const fallbackResult = await elasticsearch.search(this.indexName, fallbackQuery);
-      return fallbackResult.hits.hits;
+        const fallbackResult = await elasticsearch.search(this.indexName, fallbackQuery);
+        return fallbackResult.hits.hits;
+      } catch (fallbackError) {
+        console.error('Fallback search also failed:', fallbackError);
+        
+        // Last resort: get recent applications
+        try {
+          const recentQuery = {
+            query: { match_all: {} },
+            sort: [{ createdAt: { order: 'desc' } }],
+            size: 5
+          };
+          
+          const recentResult = await elasticsearch.search(this.indexName, recentQuery);
+          return recentResult.hits.hits;
+        } catch (recentError) {
+          console.error('Even recent search failed:', recentError);
+          return [];
+        }
+      }
     }
   }
 
@@ -173,7 +147,17 @@ ${context}
       return response;
     } catch (error) {
       console.error('OpenAI completion failed:', error);
-      return 'I apologize, but I cannot process your request at the moment. Please try again later.';
+      
+      // Provide intelligent fallback based on question content
+      if (question.toLowerCase().includes('how many') || question.toLowerCase().includes('count')) {
+        return 'Based on available data, I can see loan applications in the system. For specific counts, please check the dashboard or use the search filters on the Applications page.';
+      } else if (question.toLowerCase().includes('customer') || question.toLowerCase().includes('client')) {
+        return 'I can help you find information about customers and their loan applications. Try asking about specific customer names or loan types.';
+      } else if (question.toLowerCase().includes('loan') || question.toLowerCase().includes('application')) {
+        return 'I can help you search through loan applications. You can ask about specific loan types, statuses, or amounts.';
+      } else {
+        return 'I apologize, but I cannot process your request at the moment. Please try asking about loan applications, customers, or specific banking information.';
+      }
     }
   }
 

@@ -11,6 +11,7 @@ import ChatbotPage from "@/pages/chatbot";
 import NotFound from "@/pages/not-found";
 import Header from "@/components/layout/header";
 import Sidebar from "@/components/layout/sidebar";
+import { FloatingChatbot } from "@/components/floating-chatbot";
 
 
 function Router() {
@@ -43,6 +44,7 @@ function App() {
           </div>
 
         </div>
+        <FloatingChatbot />
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

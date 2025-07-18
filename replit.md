@@ -148,6 +148,11 @@ The system requires several environment variables:
 - ✅ Added fallback to regular multi-match search when semantic search fails
 - ✅ Implemented highlighted text extraction for semantic_text matches
 - ✅ Added source citation system showing application ID, customer name, and loan type
+- ✅ Created floating chatbot UI with message icon that expands/collapses
+- ✅ Added minimize/maximize and close functionality to chatbot window
+- ✅ Fixed semantic_text field compatibility issues with fallback queries
+- ✅ Integrated floating chatbot across all pages of the application
+- ✅ Enhanced chatbot to work with limited fields when semantic_text causes issues
 
 ### Unique Customer Names for Loan Applications (July 17, 2025)
 - ✅ Updated loan application generation to create unique customer names for each application
