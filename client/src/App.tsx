@@ -10,7 +10,7 @@ import Documents from "@/pages/documents";
 import NotFound from "@/pages/not-found";
 import Header from "@/components/layout/header";
 import Sidebar from "@/components/layout/sidebar";
-import RAGChatbot from "@/components/chatbot/rag-chatbot";
+
 
 function Router() {
   return (
@@ -39,7 +39,7 @@ function App() {
               </div>
             </main>
           </div>
-          <RAGChatbot />
+
         </div>
         <Toaster />
       </TooltipProvider>

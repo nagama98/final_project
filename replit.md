@@ -108,7 +108,6 @@ The system requires several environment variables:
 
 ### Key Features
 - **Hybrid Search**: Combines keyword and semantic search capabilities
-- **RAG Chatbot**: AI assistant with document context awareness using Elasticsearch ML models
 - **Document Processing**: Automatic text extraction and embedding generation via Elasticsearch ML
 - **Real-time Analytics**: Dashboard metrics and risk assessment
 - **Role-based Access**: Customer, loan officer, and manager roles
@@ -120,7 +119,7 @@ The system requires several environment variables:
 
 ### Code Cleanup and Optimization (July 17, 2025)
 - ✅ Removed all unused files and cleaned up codebase for better maintainability
-- ✅ Deleted unused server files: fix-customer-data.ts, data-generator.ts, rag.ts, storage.ts
+- ✅ Deleted unused server files: fix-customer-data.ts, data-generator.ts, rag.ts, storage.ts, semantic-rag.ts
 - ✅ Removed unused client pages: data-management.tsx, new-application.tsx
 - ✅ Cleaned up unused UI components (25+ unused shadcn/ui components removed)
 - ✅ Fixed all import errors and dependency references after file removal
@@ -129,6 +128,12 @@ The system requires several environment variables:
 - ✅ Removed unused attached_assets folder and documentation files
 - ✅ Eliminated redundant code and simplified architecture
 - ✅ Verified application still functions properly with cleaned codebase
+- ✅ Completely removed chatbot functionality from codebase as requested
+- ✅ Removed RAG chatbot component and all chatbot-related UI elements
+- ✅ Deleted all chatbot API endpoints (/api/chat, /api/semantic-search)
+- ✅ Removed chatMessage schema and related database operations
+- ✅ Cleaned up all chatbot imports and references from frontend and backend
+- ✅ Simplified architecture to focus on core loan management features only
 
 ### Unique Customer Names for Loan Applications (July 17, 2025)
 - ✅ Updated loan application generation to create unique customer names for each application

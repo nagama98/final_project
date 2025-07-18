@@ -44,14 +44,7 @@ export const documents = pgTable("documents", {
   uploadedAt: timestamp("uploaded_at").defaultNow(),
 });
 
-export const chatMessages = pgTable("chat_messages", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
-  message: text("message").notNull(),
-  response: text("response"),
-  context: json("context").$type<any[]>(),
-  timestamp: timestamp("timestamp").defaultNow(),
-});
+
 
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
@@ -70,10 +63,7 @@ export const insertDocumentSchema = createInsertSchema(documents).omit({
   uploadedAt: true,
 });
 
-export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
-  id: true,
-  timestamp: true,
-});
+
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -82,8 +72,7 @@ export type LoanApplication = typeof loanApplications.$inferSelect;
 export type InsertLoanApplication = z.infer<typeof insertLoanApplicationSchema>;
 export type Document = typeof documents.$inferSelect;
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
-export type ChatMessage = typeof chatMessages.$inferSelect;
-export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+
 
 // Elasticsearch document types
 export type CustomerESDocument = {

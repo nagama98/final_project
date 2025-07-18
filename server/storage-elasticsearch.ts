@@ -1,12 +1,12 @@
-import { users, loanApplications, documents, chatMessages, type User, type InsertUser, type LoanApplication, type InsertLoanApplication, type Document, type InsertDocument, type ChatMessage, type InsertChatMessage } from "@shared/schema";
+import { users, loanApplications, documents, type User, type InsertUser, type LoanApplication, type InsertLoanApplication, type Document, type InsertDocument } from "@shared/schema";
 import { elasticsearch } from "./services/elasticsearch";
-import type { IStorage } from "./storage";
 
-export class ElasticsearchStorage implements IStorage {
+
+export class ElasticsearchStorage {
   private currentUserId: number = 1;
   private currentApplicationId: number = 1;
   private currentDocumentId: number = 1;
-  private currentChatMessageId: number = 1;
+
 
   constructor() {
     // Initialize with some counter values
@@ -19,8 +19,6 @@ export class ElasticsearchStorage implements IStorage {
       const users = await elasticsearch.getAllDocuments('users', 1);
       const applications = await elasticsearch.getAllDocuments('loan_applications', 1);
       const docs = await elasticsearch.getAllDocuments('documents', 1);
-      const messages = await elasticsearch.getAllDocuments('chat_messages', 1);
-
       if (users.length > 0) {
         this.currentUserId = Math.max(...users.map(u => u.id)) + 1;
       }
@@ -29,9 +27,6 @@ export class ElasticsearchStorage implements IStorage {
       }
       if (docs.length > 0) {
         this.currentDocumentId = Math.max(...docs.map(d => d.id)) + 1;
-      }
-      if (messages.length > 0) {
-        this.currentChatMessageId = Math.max(...messages.map(m => m.id)) + 1;
       }
     } catch (error) {
       console.warn('Failed to initialize counters from Elasticsearch:', error);
@@ -344,53 +339,7 @@ export class ElasticsearchStorage implements IStorage {
     }
   }
 
-  // Chat Message methods
-  async getChatMessage(id: number): Promise<ChatMessage | undefined> {
-    try {
-      const result = await elasticsearch.getDocument('chat_messages', id.toString());
-      return result || undefined;
-    } catch (error) {
-      console.error('Failed to get chat message:', error);
-      return undefined;
-    }
-  }
 
-  async getChatMessagesByUser(userId: number): Promise<ChatMessage[]> {
-    try {
-      const response = await elasticsearch.search('chat_messages', {
-        query: {
-          term: { userId: userId }
-        },
-        size: 100,
-        sort: [{ createdAt: { order: 'asc' } }]
-      });
-      
-      return response.hits.hits.map((hit: any) => ({
-        id: hit._id,
-        ...hit._source
-      }));
-    } catch (error) {
-      console.error('Failed to get chat messages by user:', error);
-      return [];
-    }
-  }
-
-  async createChatMessage(insertMessage: InsertChatMessage): Promise<ChatMessage> {
-    const id = this.currentChatMessageId++;
-    const message: ChatMessage = { 
-      ...insertMessage, 
-      id, 
-      createdAt: new Date() 
-    };
-
-    try {
-      await elasticsearch.indexDocument('chat_messages', id.toString(), message);
-      return message;
-    } catch (error) {
-      console.error('Failed to create chat message:', error);
-      throw error;
-    }
-  }
 }
 
 export const elasticsearchStorage = new ElasticsearchStorage();

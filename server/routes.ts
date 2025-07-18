@@ -3,9 +3,9 @@ import { createServer, type Server } from "http";
 import { elasticsearchStorage } from "./storage-elasticsearch";
 import { elasticsearch } from "./services/elasticsearch";
 import { openai } from "./services/openai";
-import { semanticRAGService } from './services/semantic-rag';
+
 import { customerGenerator } from "./services/customer-generator";
-import { insertLoanApplicationSchema, insertDocumentSchema, insertChatMessageSchema } from "@shared/schema";
+import { insertLoanApplicationSchema, insertDocumentSchema } from "@shared/schema";
 import multer from "multer";
 import { z } from "zod";
 
@@ -546,118 +546,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Semantic search endpoint
-  app.post("/api/semantic-search", async (req, res) => {
-    try {
-      const { query, filters = {} } = req.body;
-      
-      if (!query) {
-        return res.status(400).json({ error: "Query is required" });
-      }
 
-      console.log('🔍 Semantic search request:', query);
-      
-      // Use semantic search with filters
-      const results = await semanticRAGService.searchWithFilters(query, filters);
-      
-      res.json({
-        results: results.map(hit => ({
-          id: hit._id,
-          score: hit._score,
-          source: hit._source,
-          highlight: hit.highlight
-        })),
-        total: results.length,
-        query: query,
-        filters: filters
-      });
-    } catch (error) {
-      console.error('Semantic search error:', error);
-      res.status(500).json({ error: "Failed to perform semantic search" });
-    }
-  });
-
-  // Enhanced chatbot with semantic RAG functionality
-  app.post("/api/chat", async (req, res) => {
-    try {
-      const { message, userId } = req.body;
-      
-      if (!message) {
-        return res.status(400).json({ error: "Message is required" });
-      }
-
-      console.log('🤖 Chatbot received message:', message);
-      
-      // Enhanced chatbot flow:
-      // 1. Check if it's a complex query suitable for semantic search
-      // 2. Use semantic RAG service for natural language processing
-      // 3. Fallback to traditional RAG for simple queries
-      // 4. Return AI-generated response
-      
-      let result;
-      
-      // Use semantic RAG for complex analytical queries, traditional RAG for simple lookup queries
-      const isComplexQuery = message.length > 50 && 
-        (message.includes('relationship') || message.includes('analysis') || message.includes('understand') || 
-         message.includes('compare') || message.includes('trends') || message.includes('patterns') ||
-         message.includes('correlation') || message.includes('complex') || message.includes('analytical'));
-      
-      console.log(`📊 Query analysis: length=${message.length}, isComplexQuery=${isComplexQuery}`);
-      
-      if (isComplexQuery) {
-        console.log('🧠 Using semantic RAG for complex analytical query');
-        const semanticResponse = await semanticRAGService.processQuery(message);
-        result = {
-          response: semanticResponse,
-          context: [],
-          metadata: { useSemanticRAG: true }
-        };
-      } else {
-        console.log('🔍 Using traditional RAG for simple query');
-        result = await rag.generateRAGResponse(message, userId || 1);
-      }
-      
-      // Store chat message in Elasticsearch if available, fallback to memory
-      try {
-        await elasticsearchStorage.createChatMessage({
-          userId: userId || 1,
-          message,
-          response: result.response
-        });
-      } catch (error) {
-        console.warn('Failed to store chat in Elasticsearch, using memory storage:', error);
-        await elasticsearchStorage.createChatMessage({
-          userId: userId || 1,
-          message,
-          response: result.response
-        });
-      }
-
-      res.json({
-        response: result.response,
-        context: result.context,
-        metadata: {
-          searchResults: result.context?.length || 0,
-          queryProcessed: true,
-          useSemanticRAG: result.metadata?.useSemanticRAG || false
-        }
-      });
-    } catch (error) {
-      console.error('Chat endpoint error:', error);
-      res.status(500).json({ error: "Failed to process chat message" });
-    }
-  });
-
-  // Get chat history
-  app.get("/api/chat/:userId", async (req, res) => {
-    try {
-      const { userId } = req.params;
-      const messages = await elasticsearchStorage.getChatMessagesByUser(parseInt(userId));
-      res.json(messages);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch chat history" });
-    }
-  });
 
   // Advanced search endpoint
   app.post("/api/search", async (req, res) => {
