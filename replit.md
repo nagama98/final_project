@@ -138,6 +138,17 @@ The system requires several environment variables:
 - ✅ Replaced complex text field with semantic sub-fields with simple semantic_text type
 - ✅ Applied mapping changes to both initialization and recreate-index endpoints
 
+### Chatbot Implementation with Azure OpenAI (July 18, 2025)
+- ✅ Created comprehensive chatbot service using semantic_text field with Azure OpenAI
+- ✅ Implemented RRF (Reciprocal Rank Fusion) search pattern with semantic queries
+- ✅ Added semantic search on description, customerName, loanType, and purpose fields
+- ✅ Created responsive chatbot UI component with message history and source citations
+- ✅ Added chatbot API endpoint with proper error handling and validation
+- ✅ Integrated chatbot into sidebar navigation as "AI Assistant"
+- ✅ Added fallback to regular multi-match search when semantic search fails
+- ✅ Implemented highlighted text extraction for semantic_text matches
+- ✅ Added source citation system showing application ID, customer name, and loan type
+
 ### Unique Customer Names for Loan Applications (July 17, 2025)
 - ✅ Updated loan application generation to create unique customer names for each application
 - ✅ Each of the 100,000 loan applications now has a different customer name combination

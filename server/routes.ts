@@ -616,6 +616,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Chatbot endpoint
+  app.post("/api/chatbot", async (req, res) => {
+    try {
+      const { question } = req.body;
+      
+      if (!question || typeof question !== 'string') {
+        return res.status(400).json({ error: "Question is required" });
+      }
+
+      const { chatbot } = await import('./services/chatbot.js');
+      const result = await chatbot.processQuery(question);
+      
+      res.json(result);
+    } catch (error) {
+      console.error('Chatbot endpoint error:', error);
+      res.status(500).json({ 
+        error: "Failed to process chatbot request",
+        answer: "I apologize, but I encountered an error while processing your request. Please try again.",
+        sources: [],
+        searchResults: []
+      });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

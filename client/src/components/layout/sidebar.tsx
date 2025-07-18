@@ -2,7 +2,8 @@ import {
   BarChart3, 
   FileText, 
   Users, 
-  FolderOpen
+  FolderOpen,
+  MessageCircle
 } from "lucide-react";
 import { useLocation } from "wouter";
 
@@ -17,6 +18,7 @@ export default function Sidebar() {
         { name: "Applications", icon: FileText, href: "/applications" },
         { name: "Customers", icon: Users, href: "/customers" },
         { name: "Documents", icon: FolderOpen, href: "/documents" },
+        { name: "AI Assistant", icon: MessageCircle, href: "/chatbot" },
       ]
     }
   ];

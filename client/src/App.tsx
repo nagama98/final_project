@@ -7,6 +7,7 @@ import Dashboard from "@/pages/dashboard";
 import Applications from "@/pages/applications";
 import Customers from "@/pages/customers";
 import Documents from "@/pages/documents";
+import ChatbotPage from "@/pages/chatbot";
 import NotFound from "@/pages/not-found";
 import Header from "@/components/layout/header";
 import Sidebar from "@/components/layout/sidebar";
@@ -20,6 +21,7 @@ function Router() {
       <Route path="/applications" component={Applications} />
       <Route path="/customers" component={Customers} />
       <Route path="/documents" component={Documents} />
+      <Route path="/chatbot" component={ChatbotPage} />
       <Route component={NotFound} />
     </Switch>
   );
