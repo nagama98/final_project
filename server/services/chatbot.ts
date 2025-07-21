@@ -425,10 +425,11 @@ REAL-TIME SEARCH RESULTS:
 ${context || 'No specific loan data found for this query.'}${searchSummary}
 
 RESPONSE GUIDELINES:
-1. ALWAYS START your response with: "**Found [X] matching loan applications out of [Y] total applications in the database**"
-2. Then provide a brief summary of the loan types and statuses found
-3. Write in clear, natural English using short paragraphs for easy reading
-4. For data queries: Present information in organized, digestible chunks
+1. For COUNT queries: START with "**Total: [Y] loan applications in the database**" then provide comprehensive statistics
+2. For SEARCH queries: START with "**Found [X] matching loan applications out of [Y] total applications**"
+3. Then provide a brief summary of the loan types and statuses found
+4. Write in clear, natural English using short paragraphs for easy reading
+5. For data queries: Present information in organized, digestible chunks
 4. Use bullet points or numbered lists when presenting multiple items
 5. Keep sentences concise and avoid overly technical language
 6. Format loan amounts with proper currency formatting ($50,000)
@@ -496,7 +497,15 @@ Remember: Focus on clarity, readability, and natural conversation flow.`;
                            question.toLowerCase().includes('under') || question.toLowerCase().includes('over') ||
                            /(\$?[0-9,]+)/.test(question);
       
+      // Check if this is a count-based query that needs total statistics
+      const isCountQuery = question.toLowerCase().includes('total') || question.toLowerCase().includes('count') || 
+                          question.toLowerCase().includes('how many') || question.toLowerCase().includes('number of') ||
+                          question.toLowerCase().includes('statistics') || question.toLowerCase().includes('summary') ||
+                          question.toLowerCase().includes('overview') || question.toLowerCase().includes('breakdown') ||
+                          /^(all|show me all|list all).*applications?$/i.test(question.trim());
+      
       console.log(`🔍 Amount query detection: ${isAmountQuery} for "${question}"`);
+      console.log(`📊 Count query detection: ${isCountQuery} for "${question}"`);
       
       let searchResults: any[] = [];
       let totalResults = 0;
@@ -519,6 +528,34 @@ Remember: Focus on clarity, readability, and natural conversation flow.`;
         totalResults = result.hits.total?.value || result.hits.total || 0;
         
         console.log(`💰 Amount-based search: Found ${searchResults.length} results out of ${totalResults} total`);
+      } else if (isCountQuery) {
+        // For count queries, get comprehensive statistics from entire index
+        console.log(`📊 Count query detected, getting comprehensive statistics...`);
+        
+        const result = await elasticsearch.search(this.indexName, {
+          query: { match_all: {} },
+          size: 50, // Get some examples
+          sort: [{ "createdAt": { "order": "desc" } }],
+          aggs: {
+            loan_types: {
+              terms: { field: "loanType", size: 10 }
+            },
+            statuses: {
+              terms: { field: "status", size: 10 }
+            },
+            total_amount: {
+              sum: { field: "amount" }
+            },
+            avg_amount: {
+              avg: { field: "amount" }
+            }
+          }
+        });
+        
+        searchResults = result.hits.hits;
+        totalResults = result.hits.total?.value || result.hits.total || 0;
+        
+        console.log(`📊 Count-based search: Found ${searchResults.length} sample results out of ${totalResults} total applications`);
       } else {
         // Regular semantic search
         searchResults = await this.searchElasticsearch(question);
