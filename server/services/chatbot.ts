@@ -133,13 +133,30 @@ export class ChatbotService {
   }
 
   private extractAmountRange(query: string): any {
-    const amountMatch = query.match(/(\$?[\d,]+)/);
-    if (amountMatch) {
-      const amount = parseInt(amountMatch[1].replace(/[$,]/g, ''));
-      if (query.includes('above') || query.includes('over') || query.includes('>')) {
-        return { gte: amount };
-      } else if (query.includes('below') || query.includes('under') || query.includes('<')) {
-        return { lte: amount };
+    // Enhanced amount extraction patterns
+    const patterns = [
+      /(?:below|under|less\s+than)\s+\$?([0-9,]+(?:k|thousand)?)/i,
+      /(?:above|over|greater\s+than|more\s+than)\s+\$?([0-9,]+(?:k|thousand)?)/i,
+      /\$?([0-9,]+(?:k|thousand)?)\s+(?:or\s+)?(?:below|under|less)/i,
+      /\$?([0-9,]+(?:k|thousand)?)\s+(?:or\s+)?(?:above|over|more)/i
+    ];
+    
+    for (const pattern of patterns) {
+      const match = query.match(pattern);
+      if (match) {
+        let amount = match[1].replace(/[$,]/g, '');
+        if (amount.includes('k') || amount.includes('thousand')) {
+          amount = amount.replace(/[k\s]/gi, '').replace('thousand', '') + '000';
+        }
+        const numAmount = parseInt(amount);
+        
+        if (pattern.source.includes('below|under|less')) {
+          console.log(`💰 Extracted amount filter: <= ${numAmount}`);
+          return { lte: numAmount };
+        } else {
+          console.log(`💰 Extracted amount filter: >= ${numAmount}`);
+          return { gte: numAmount };
+        }
       }
     }
     return {};
@@ -161,14 +178,28 @@ export class ChatbotService {
     if (lowerQuestion.includes('pending')) conditions.push('status: pending');
     if (lowerQuestion.includes('rejected')) conditions.push('status: rejected');
     
-    // Extract amount conditions
-    const amountMatch = question.match(/(\$?[\d,]+)/);
-    if (amountMatch) {
-      const amount = amountMatch[1];
-      if (lowerQuestion.includes('above') || lowerQuestion.includes('over')) {
-        conditions.push(`amount above ${amount}`);
-      } else if (lowerQuestion.includes('below') || lowerQuestion.includes('under')) {
-        conditions.push(`amount below ${amount}`);
+    // Enhanced amount condition parsing with better pattern matching
+    const amountPatterns = [
+      /(?:below|under|less\s+than)\s+\$?([0-9,]+(?:k|thousand)?)/i,
+      /(?:above|over|greater\s+than|more\s+than)\s+\$?([0-9,]+(?:k|thousand)?)/i,
+      /\$?([0-9,]+(?:k|thousand)?)\s+(?:or\s+)?(?:below|under|less)/i,
+      /\$?([0-9,]+(?:k|thousand)?)\s+(?:or\s+)?(?:above|over|more)/i
+    ];
+    
+    for (const pattern of amountPatterns) {
+      const match = question.match(pattern);
+      if (match) {
+        let amount = match[1].replace(/[$,]/g, '');
+        if (amount.includes('k') || amount.includes('thousand')) {
+          amount = amount.replace(/[k\s]/gi, '').replace('thousand', '') + '000';
+        }
+        
+        if (pattern.source.includes('below|under|less')) {
+          conditions.push(`amount below $${amount}`);
+        } else {
+          conditions.push(`amount above $${amount}`);
+        }
+        break;
       }
     }
     
@@ -246,10 +277,11 @@ export class ChatbotService {
       query.bool.must.push({ term: { 'status.keyword': 'rejected' } });
     }
     
-    // Add amount range filter
+    // Add amount range filter with better parsing
     const amountMatch = conditions.match(/amount\s+(above|below)\s+\$?([0-9,]+)/);
     if (amountMatch) {
       const amount = parseInt(amountMatch[2].replace(/,/g, ''));
+      console.log(`💰 Adding amount filter: ${amountMatch[1]} ${amount}`);
       if (amountMatch[1] === 'above') {
         query.bool.must.push({ range: { amount: { gte: amount } } });
       } else {
@@ -456,14 +488,46 @@ Remember: Focus on clarity, readability, and natural conversation flow.`;
     console.log(`🤖 Processing comprehensive chatbot query: "${question}"`);
     
     try {
-      // Get search results from Elasticsearch
-      const searchResults = await this.searchElasticsearch(question);
+      // Check if this is an amount-based query and handle it specially
+      const isAmountQuery = question.toLowerCase().includes('below') || question.toLowerCase().includes('above') || 
+                           question.toLowerCase().includes('under') || question.toLowerCase().includes('over') ||
+                           /(\$?[0-9,]+)/.test(question);
+      
+      console.log(`🔍 Amount query detection: ${isAmountQuery} for "${question}"`);
+      
+      let searchResults: any[] = [];
+      let totalResults = 0;
+      
+      if (isAmountQuery) {
+        // For amount queries, search the entire index with proper filtering
+        const amountFilter = this.extractAmountRange(question);
+        console.log(`💰 Amount query detected: ${JSON.stringify(amountFilter)}`);
+        
+        const searchQuery = {
+          query: amountFilter.gte || amountFilter.lte ? {
+            range: { amount: amountFilter }
+          } : { match_all: {} },
+          size: 50,
+          sort: [{ amount: { order: amountFilter.lte ? 'desc' : 'asc' } }]
+        };
+        
+        const result = await elasticsearch.search(this.indexName, searchQuery);
+        searchResults = result.hits.hits;
+        totalResults = result.hits.total?.value || result.hits.total || 0;
+        
+        console.log(`💰 Amount-based search: Found ${searchResults.length} results out of ${totalResults} total`);
+      } else {
+        // Regular semantic search
+        searchResults = await this.searchElasticsearch(question);
+        totalResults = searchResults.length;
+      }
       
       const searchTime = Date.now() - startTime;
       console.log(`📊 Search completed in ${searchTime}ms - Found ${searchResults.length} relevant results`);
       
       // Analyze search results for better context
       const metadata = this.analyzeSearchResults(searchResults, question);
+      metadata.totalResults = totalResults;
       console.log(`📈 Search analysis: ${metadata.summary}`);
       
       // Create enhanced context prompt

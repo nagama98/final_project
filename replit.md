@@ -208,6 +208,14 @@ The system requires several environment variables:
 - ✅ Improved chatbot error handling with simplified fallback responses
 - ✅ Successfully tested comprehensive search functionality with business loan queries
 - ✅ Verified chatbot processes natural language queries and provides structured responses
+- ✅ Fixed Elasticsearch field mapping for amount, interestRate, and income to use numeric types (double/float)
+- ✅ Resolved "Fielddata is disabled" error by changing amount field from text to double type
+- ✅ Enhanced amount-based query parsing with comprehensive regex patterns for "below/above/under/over"
+- ✅ Implemented direct Elasticsearch range queries for amount filtering on entire index
+- ✅ Successfully tested "show me all loan below 15000" query returning 39 real loan applications
+- ✅ Verified comprehensive amount-based search with proper numeric filtering and sorting
+- ✅ Added detailed logging for amount query detection and filter extraction debugging
+- ✅ Confirmed chatbot now queries entire loan_applications index for accurate statistical responses
 
 ### Unique Customer Names for Loan Applications (July 17, 2025)
 - ✅ Updated loan application generation to create unique customer names for each application
