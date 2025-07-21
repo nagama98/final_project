@@ -519,7 +519,7 @@ Remember: Focus on clarity, readability, and natural conversation flow.`;
           query: amountFilter.gte || amountFilter.lte ? {
             range: { amount: amountFilter }
           } : { match_all: {} },
-          size: 50,
+          size: 1000, // Return up to 1000 matching results for better accuracy
           sort: [{ amount: { order: amountFilter.lte ? 'desc' : 'asc' } }]
         };
         
@@ -570,9 +570,22 @@ Remember: Focus on clarity, readability, and natural conversation flow.`;
       metadata.totalResults = totalResults;
       console.log(`📈 Search analysis: ${metadata.summary}`);
       
-      // Create enhanced context prompt with total count
-      const contextPrompt = this.createContextPrompt(searchResults, metadata) + 
-        `\n\nIMPORTANT CONTEXT: Found ${searchResults.length} matching loan applications out of ${totalResults} total applications in the database.`;
+      // Create enhanced context prompt with total count - fix the count display logic
+      let contextPrompt;
+      if (isAmountQuery) {
+        // For amount queries: totalResults = matching count, need to get total database count
+        const totalInDatabase = await this.getTotalApplicationsCount();
+        contextPrompt = this.createContextPrompt(searchResults, metadata) + 
+          `\n\nIMPORTANT CONTEXT: Found ${totalResults} matching loan applications out of ${totalInDatabase} total applications in the database. Showing ${searchResults.length} sample results. ALWAYS start your response with "Found ${totalResults} matching loan applications out of ${totalInDatabase} total applications".`;
+      } else if (isCountQuery) {
+        // For count queries: totalResults = total in database
+        contextPrompt = this.createContextPrompt(searchResults, metadata) + 
+          `\n\nIMPORTANT CONTEXT: Total applications in database: ${totalResults}. Providing comprehensive statistics. ALWAYS start your response with "Total: ${totalResults} loan applications in the database".`;
+      } else {
+        // For regular searches: searchResults.length = matching count
+        contextPrompt = this.createContextPrompt(searchResults, metadata) + 
+          `\n\nIMPORTANT CONTEXT: Found ${searchResults.length} matching loan applications. Showing detailed results.`;
+      }
       
       // Generate AI response with timing
       const responseStartTime = Date.now();
@@ -651,6 +664,20 @@ Remember: Focus on clarity, readability, and natural conversation flow.`;
       avgScore,
       summary: `${totalResults} results across ${loanTypes.size} loan types with ${statuses.size} different statuses`
     };
+  }
+
+  private async getTotalApplicationsCount(): Promise<number> {
+    try {
+      const result = await elasticsearch.search(this.indexName, {
+        query: { match_all: {} },
+        size: 0, // We only need the count, not the documents
+        track_total_hits: true
+      });
+      return result.hits.total?.value || result.hits.total || 0;
+    } catch (error) {
+      console.error('Error getting total application count:', error);
+      return 0;
+    }
   }
 
   private getContextualErrorResponse(question: string, error: unknown): string {
