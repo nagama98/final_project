@@ -409,6 +409,8 @@ Write concisely for chat interface readability.`;
     }
 
     const searchSummary = metadata ? `\n\nSEARCH SUMMARY:\n${metadata.summary}\nTotal loan amount in results: $${context ? metadata.totalAmount?.toLocaleString() : '0'}\nAverage relevance score: ${metadata.avgScore?.toFixed(2)}\n` : '';
+    
+    // This will be added by the caller
 
     const prompt = `You are an AI assistant for ElastiBank, a comprehensive loan management system. You help loan officers, managers, and staff with ALL types of questions about banking, loans, and customer service.
 
@@ -423,9 +425,10 @@ REAL-TIME SEARCH RESULTS:
 ${context || 'No specific loan data found for this query.'}${searchSummary}
 
 RESPONSE GUIDELINES:
-1. Write in clear, natural English using short paragraphs for easy reading
-2. Start responses with a friendly acknowledgment of what was found
-3. For data queries: Present information in organized, digestible chunks
+1. ALWAYS START your response with: "**Found [X] matching loan applications out of [Y] total applications in the database**"
+2. Then provide a brief summary of the loan types and statuses found
+3. Write in clear, natural English using short paragraphs for easy reading
+4. For data queries: Present information in organized, digestible chunks
 4. Use bullet points or numbered lists when presenting multiple items
 5. Keep sentences concise and avoid overly technical language
 6. Format loan amounts with proper currency formatting ($50,000)
@@ -530,8 +533,9 @@ Remember: Focus on clarity, readability, and natural conversation flow.`;
       metadata.totalResults = totalResults;
       console.log(`📈 Search analysis: ${metadata.summary}`);
       
-      // Create enhanced context prompt
-      const contextPrompt = this.createContextPrompt(searchResults, metadata);
+      // Create enhanced context prompt with total count
+      const contextPrompt = this.createContextPrompt(searchResults, metadata) + 
+        `\n\nIMPORTANT CONTEXT: Found ${searchResults.length} matching loan applications out of ${totalResults} total applications in the database.`;
       
       // Generate AI response with timing
       const responseStartTime = Date.now();

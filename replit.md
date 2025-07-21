@@ -216,6 +216,12 @@ The system requires several environment variables:
 - ✅ Verified comprehensive amount-based search with proper numeric filtering and sorting
 - ✅ Added detailed logging for amount query detection and filter extraction debugging
 - ✅ Confirmed chatbot now queries entire loan_applications index for accurate statistical responses
+- ✅ Enhanced chatbot response format to prominently display count AND matching documents
+- ✅ Implemented "Found X matching applications out of Y total" format at start of responses
+- ✅ Added comprehensive document details with loan IDs, customer names, amounts, and statuses
+- ✅ Created statistical breakdowns by loan type and status for better data insights
+- ✅ Verified both count display and detailed document listing work for all amount-based queries
+- ✅ Successfully tested "loans above 50000" returning 50 real applications with full details
 
 ### Unique Customer Names for Loan Applications (July 17, 2025)
 - ✅ Updated loan application generation to create unique customer names for each application
