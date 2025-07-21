@@ -133,7 +133,7 @@ export function FloatingChatbot() {
                           <Bot className="h-4 w-4 text-white" />
                         </div>
                       )}
-                      <div className={`max-w-[85%] ${message.type === 'user' ? 'order-first' : ''}`}>
+                      <div className={`max-w-[90%] ${message.type === 'user' ? 'order-first' : ''}`}>
                         <div
                           className={`p-2 rounded-lg text-xs leading-5 ${
                             message.type === 'user'
@@ -141,7 +141,7 @@ export function FloatingChatbot() {
                               : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
                           }`}
                         >
-                          <div className="floating-chatbot-text">
+                          <div className="floating-chatbot-text break-words overflow-wrap-anywhere whitespace-pre-wrap">
                             {formatBotResponse(message.content)}
                           </div>
                           {message.sources && message.sources.length > 0 && (

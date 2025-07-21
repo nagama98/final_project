@@ -295,9 +295,7 @@ export class ChatbotService {
         context += '\n';
       }
       
-      if (stats.aggregations.total_amount) {
-        context += `TOTAL LOAN AMOUNT: $${stats.aggregations.total_amount.value.toLocaleString()}\n\n`;
-      }
+
     }
     
     context += `EXAMPLE LOAN APPLICATIONS (showing ${Math.min(4, searchResults.length)} examples):\n\n`;
@@ -326,28 +324,30 @@ SEARCH QUERY: "${question}"
 ${context}
 
 INSTRUCTIONS:
-1. Start with a clear summary: "I found [X] loan applications matching your criteria out of [Y] total applications in the database."
-2. Provide key statistics and breakdowns when available
-3. List 3-4 specific examples with key details
-4. Keep the response conversational and easy to read
-5. Format loan amounts properly ($50,000)
-6. End with an offer to provide more specific information
+1. Start with: "I found [X] applications out of [Y] total in the database."
+2. Provide 2-3 key statistics when available
+3. List 2-3 specific examples with essential details
+4. Keep responses short and scannable (max 150 words)
+5. Use bullet points for readability
+6. Format amounts as $50K for brevity
 
-Focus on being informative and comprehensive while maintaining readability.`;
+Write concisely for chat interface readability.`;
 
     try {
-      const response = await openai.generateChatCompletion([
-        { role: 'system', content: prompt },
-        { role: 'user', content: question }
-      ], {
+      const response = await openai.client.chat.completions.create({
+        model: openai.getChatModel(),
+        messages: [
+          { role: 'system', content: prompt },
+          { role: 'user', content: question }
+        ],
         temperature: 0.3,
-        max_tokens: 500
+        max_tokens: 200
       });
       
-      return response || 'I apologize, but I could not generate a comprehensive response at this time.';
+      return response.choices[0].message.content || 'I apologize, but I could not generate a comprehensive response at this time.';
     } catch (error) {
       console.error('Failed to generate comprehensive response:', error);
-      return this.generateFallbackResponse(question);
+      return "I'm experiencing technical difficulties. Please try a simpler question.";
     }
   }
 
@@ -456,33 +456,28 @@ Remember: Focus on clarity, readability, and natural conversation flow.`;
     console.log(`🤖 Processing comprehensive chatbot query: "${question}"`);
     
     try {
-      // Parse the query to understand what the user wants
-      const queryConditions = this.parseQueryConditions(question);
-      console.log(`📋 Parsed conditions: ${queryConditions}`);
-      
-      // Get comprehensive statistics from entire index
-      console.log('📊 Getting comprehensive statistics from entire index...');
-      const comprehensiveStats = await this.getFullIndexStats(queryConditions);
-      
-      // Get specific examples for the query
+      // Get search results from Elasticsearch
       const searchResults = await this.searchElasticsearch(question);
       
       const searchTime = Date.now() - startTime;
-      console.log(`✅ Comprehensive analysis completed: Found ${comprehensiveStats.totalMatching} matching records out of ${comprehensiveStats.totalInIndex} total`);
+      console.log(`📊 Search completed in ${searchTime}ms - Found ${searchResults.length} relevant results`);
       
-      // Generate enhanced context with full statistics
-      const context = this.createComprehensiveContext(searchResults, comprehensiveStats);
+      // Analyze search results for better context
+      const metadata = this.analyzeSearchResults(searchResults, question);
+      console.log(`📈 Search analysis: ${metadata.summary}`);
       
-      // Generate AI response with comprehensive data
-      console.log('🧠 Generating comprehensive AI response...');
+      // Create enhanced context prompt
+      const contextPrompt = this.createContextPrompt(searchResults, metadata);
+      
+      // Generate AI response with timing
       const responseStartTime = Date.now();
-      
-      const response = await this.generateComprehensiveResponse(context, question, comprehensiveStats);
+      console.log('🧠 Generating AI response...');
+      const response = await this.generateResponse(contextPrompt, question);
       
       const responseTime = Date.now() - responseStartTime;
       const totalTime = Date.now() - startTime;
-      console.log(`💬 Comprehensive response generated in ${responseTime}ms`);
-      console.log(`✅ Full query processing completed in ${totalTime}ms`);
+      console.log(`💬 Response generated in ${responseTime}ms`);
+      console.log(`✅ Query processing completed in ${totalTime}ms`);
       
       // Extract enhanced sources for citation
       const sources = searchResults.slice(0, 4).map((hit, index) => ({
@@ -500,12 +495,10 @@ Remember: Focus on clarity, readability, and natural conversation flow.`;
         sources,
         searchResults: searchResults.slice(0, 4),
         metadata: {
-          totalMatching: comprehensiveStats.totalMatching,
-          totalInIndex: comprehensiveStats.totalInIndex,
-          conditions: queryConditions,
+          ...metadata,
           processingTime: totalTime,
-          searchTime: searchTime,
-          responseTime: responseTime
+          searchTime,
+          responseTime
         }
       };
     } catch (error) {

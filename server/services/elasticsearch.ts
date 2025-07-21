@@ -178,12 +178,6 @@ export class ElasticsearchService {
                 { key: 'high', from: 70 }
               ]
             }
-          },
-          amount_stats: {
-            stats: { field: 'amount' }
-          },
-          total_amount: {
-            sum: { field: 'amount' }
           }
         }
       };
