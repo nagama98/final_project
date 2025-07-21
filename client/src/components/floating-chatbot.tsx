@@ -68,12 +68,15 @@ export function FloatingChatbot() {
         body: JSON.stringify({ question: inputValue })
       });
 
+      // Parse the JSON response
+      const data = await response.json();
+
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'bot',
-        content: response.answer,
+        content: data.answer || 'I apologize, but I could not generate a response.',
         timestamp: new Date(),
-        sources: response.sources
+        sources: data.sources || []
       };
 
       setMessages(prev => [...prev, botMessage]);
