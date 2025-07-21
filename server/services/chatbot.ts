@@ -5,8 +5,11 @@ export class ChatbotService {
   private indexName = 'loan_applications';
   
   async searchElasticsearch(query: string): Promise<any[]> {
+    console.log(`🔍 Starting Elasticsearch search for: "${query}"`);
+    
     try {
-      // First try semantic search with description field
+      // Enhanced semantic search with multiple strategies
+      console.log('📡 Attempting semantic search...');
       const semanticQuery = {
         retriever: {
           rrf: {
@@ -28,65 +31,121 @@ export class ChatbotService {
           fields: {
             description: {
               type: 'semantic',
-              number_of_fragments: 2,
+              number_of_fragments: 3,
               order: 'score'
             }
           }
         },
-        size: 5
+        size: 10
       };
 
       const result = await elasticsearch.search(this.indexName, semanticQuery);
+      console.log(`✅ Semantic search successful: Found ${result.hits.hits.length} results`);
       return result.hits.hits;
-    } catch (error) {
-      console.error('Semantic search failed, trying regular search:', error);
+    } catch (semanticError) {
+      console.log('⚠️ Semantic search failed, trying enhanced multi-field search...');
       
       try {
-        // Fallback to regular search without semantic_text fields
-        const fallbackQuery = {
+        // Enhanced fallback with more comprehensive search
+        const enhancedQuery = {
           query: {
-            multi_match: {
-              query: query,
-              fields: ['customerName^2', 'loanType^1.5', 'purpose', 'status', 'applicationId'],
-              type: 'best_fields',
-              fuzziness: 'AUTO'
+            bool: {
+              should: [
+                {
+                  multi_match: {
+                    query: query,
+                    fields: ['customerName^3', 'loanType^2', 'purpose^2', 'status^1.5', 'applicationId^1.5'],
+                    type: 'best_fields',
+                    fuzziness: 'AUTO'
+                  }
+                },
+                {
+                  multi_match: {
+                    query: query,
+                    fields: ['customerName', 'loanType', 'purpose', 'status'],
+                    type: 'phrase_prefix'
+                  }
+                },
+                {
+                  wildcard: {
+                    customerName: { value: `*${query.toLowerCase()}*` }
+                  }
+                },
+                {
+                  range: {
+                    amount: this.extractAmountRange(query)
+                  }
+                }
+              ],
+              minimum_should_match: 1
             }
           },
           highlight: {
             fields: {
-              customerName: {},
-              loanType: {},
-              purpose: {},
-              status: {}
+              customerName: { number_of_fragments: 2 },
+              loanType: { number_of_fragments: 2 },
+              purpose: { number_of_fragments: 2 },
+              status: { number_of_fragments: 1 }
             }
           },
-          size: 5
+          size: 10
         };
 
-        const fallbackResult = await elasticsearch.search(this.indexName, fallbackQuery);
+        const fallbackResult = await elasticsearch.search(this.indexName, enhancedQuery);
+        console.log(`✅ Enhanced search successful: Found ${fallbackResult.hits.hits.length} results`);
         return fallbackResult.hits.hits;
       } catch (fallbackError) {
-        console.error('Fallback search also failed:', fallbackError);
+        console.log('⚠️ Enhanced search failed, trying basic search...');
         
-        // Last resort: get recent applications
         try {
-          const recentQuery = {
-            query: { match_all: {} },
-            sort: [{ createdAt: { order: 'desc' } }],
-            size: 5
+          // Basic search for any content
+          const basicQuery = {
+            query: {
+              bool: {
+                should: [
+                  { match_all: {} },
+                  {
+                    multi_match: {
+                      query: query,
+                      fields: ['*'],
+                      type: 'most_fields'
+                    }
+                  }
+                ]
+              }
+            },
+            sort: [
+              { _score: { order: 'desc' } },
+              { createdAt: { order: 'desc' } }
+            ],
+            size: 10
           };
           
-          const recentResult = await elasticsearch.search(this.indexName, recentQuery);
-          return recentResult.hits.hits;
-        } catch (recentError) {
-          console.error('Even recent search failed:', recentError);
+          const basicResult = await elasticsearch.search(this.indexName, basicQuery);
+          console.log(`✅ Basic search successful: Found ${basicResult.hits.hits.length} results`);
+          return basicResult.hits.hits;
+        } catch (basicError) {
+          console.error('❌ All search strategies failed:', basicError);
           return [];
         }
       }
     }
   }
 
-  createContextPrompt(searchResults: any[]): string {
+  private extractAmountRange(query: string): any {
+    const amountMatch = query.match(/(\$?[\d,]+)/);
+    if (amountMatch) {
+      const amount = parseInt(amountMatch[1].replace(/[$,]/g, ''));
+      if (query.includes('above') || query.includes('over') || query.includes('>')) {
+        return { gte: amount };
+      } else if (query.includes('below') || query.includes('under') || query.includes('<')) {
+        return { lte: amount };
+      }
+    }
+    return {};
+  }
+
+  createContextPrompt(searchResults: any[], metadata?: any): string {
     let context = '';
     
     for (let i = 0; i < searchResults.length; i++) {
@@ -111,29 +170,30 @@ export class ChatbotService {
       context += contextText + '\n\n';
     }
 
+    const searchSummary = metadata ? `\n\nSEARCH SUMMARY:\n${metadata.summary}\nTotal loan amount in results: $${context ? metadata.totalAmount?.toLocaleString() : '0'}\nAverage relevance score: ${metadata.avgScore?.toFixed(2)}\n` : '';
+
     const prompt = `You are an AI assistant for ElastiBank, a comprehensive loan management system. You help loan officers, managers, and staff with ALL types of questions about banking, loans, and customer service.
 
 YOUR CAPABILITIES:
-✓ Answer questions about loan applications, customers, and banking data
-✓ Provide explanations about banking processes, loan terms, and financial concepts
-✓ Help with greetings, general questions, and system guidance
-✓ Calculate statistics and provide insights from loan data
-✓ Explain loan approval processes, risk assessment, and banking procedures
+✓ Search and analyze loan applications with real-time data
+✓ Provide detailed explanations about banking processes and loan terms
+✓ Calculate statistics and provide insights from loan portfolios
+✓ Help with customer inquiries and system guidance
+✓ Explain loan approval processes and risk assessment
 
-CONTEXT DATA:
-${context}
+REAL-TIME SEARCH RESULTS:
+${context || 'No specific loan data found for this query.'}${searchSummary}
 
-INSTRUCTIONS:
-1. Answer ALL types of questions - not just data searches
-2. For loan-specific questions: Use the provided data to give accurate, detailed responses
-3. For general banking questions: Provide helpful explanations about loan processes, banking terms, financial concepts
-4. For greetings/help: Be welcoming and explain what you can help with
-5. For counts/statistics: Calculate from the provided data and explain the findings
-6. Be conversational, professional, and informative
-7. Always provide specific details when available (names, amounts, IDs)
-8. If no context data is relevant, still provide helpful banking and loan-related information
+RESPONSE GUIDELINES:
+1. Always acknowledge what data was found: "${searchResults.length} loan applications found" or "No specific matches found"
+2. For data queries: Provide precise details from the search results with specific numbers and names
+3. For general questions: Give comprehensive banking knowledge while noting available data context
+4. For greetings: Be welcoming and mention current system status (e.g., "${metadata?.totalResults || 0} loans in database")
+5. Always be specific about what you found vs. general knowledge
+6. Use the actual data when available, explain when you're providing general information
+7. Mention search performance when relevant (fast response, large dataset, etc.)
 
-Remember: You are a knowledgeable banking assistant who can discuss any topic related to loans, banking, customers, and financial services.`;
+Remember: You have access to real loan data and should provide current, specific information when available.`;
     return prompt;
   }
 
@@ -181,41 +241,116 @@ Remember: You are a knowledgeable banking assistant who can discuss any topic re
     answer: string;
     sources: any[];
     searchResults: any[];
+    metadata?: any;
   }> {
+    const startTime = Date.now();
+    console.log(`🤖 Processing chatbot query: "${question}"`);
+    
     try {
-      console.log(`🤖 Processing chatbot query: "${question}"`);
-      
-      // Search Elasticsearch with semantic_text
+      // Search Elasticsearch with enhanced logging
       const searchResults = await this.searchElasticsearch(question);
-      console.log(`📊 Found ${searchResults.length} relevant results`);
+      const searchTime = Date.now() - startTime;
+      console.log(`📊 Search completed in ${searchTime}ms - Found ${searchResults.length} relevant results`);
       
-      // Create context prompt
-      const contextPrompt = this.createContextPrompt(searchResults);
+      // Analyze search results for better context
+      const metadata = this.analyzeSearchResults(searchResults, question);
+      console.log(`📈 Search analysis: ${metadata.summary}`);
       
-      // Generate AI response
+      // Create enhanced context prompt
+      const contextPrompt = this.createContextPrompt(searchResults, metadata);
+      
+      // Generate AI response with timing
+      const responseStartTime = Date.now();
+      console.log('🧠 Generating AI response...');
       const answer = await this.generateResponse(contextPrompt, question);
+      const responseTime = Date.now() - responseStartTime;
+      console.log(`💬 Response generated in ${responseTime}ms`);
       
-      // Extract sources for citation
-      const sources = searchResults.map((hit, index) => ({
+      // Extract enhanced sources for citation
+      const sources = searchResults.slice(0, 5).map((hit, index) => ({
         position: index + 1,
         applicationId: hit._source.applicationId,
         customerName: hit._source.customerName,
         loanType: hit._source.loanType,
+        amount: hit._source.amount,
+        status: hit._source.status,
         score: hit._score
       }));
+      
+      const totalTime = Date.now() - startTime;
+      console.log(`✅ Query processing completed in ${totalTime}ms`);
       
       return {
         answer,
         sources,
-        searchResults
+        searchResults: searchResults.slice(0, 5),
+        metadata: {
+          ...metadata,
+          processingTime: totalTime,
+          searchTime,
+          responseTime
+        }
       };
     } catch (error) {
-      console.error('Chatbot processing failed:', error);
+      const errorTime = Date.now() - startTime;
+      console.error(`❌ Chatbot processing failed after ${errorTime}ms:`, error);
+      
+      // Provide contextual error response
+      const errorResponse = this.getContextualErrorResponse(question, error);
+      
       return {
-        answer: 'I apologize, but I encountered an error while processing your request. Please try again.',
+        answer: errorResponse,
         sources: [],
-        searchResults: []
+        searchResults: [],
+        metadata: {
+          error: true,
+          processingTime: errorTime,
+          errorType: error instanceof Error ? error.name : 'Unknown'
+        }
       };
+    }
+  }
+
+  private analyzeSearchResults(searchResults: any[], question: string) {
+    const totalResults = searchResults.length;
+    const loanTypes = new Set();
+    const statuses = new Set();
+    let totalAmount = 0;
+    let avgScore = 0;
+
+    searchResults.forEach(hit => {
+      const source = hit._source;
+      if (source.loanType) loanTypes.add(source.loanType);
+      if (source.status) statuses.add(source.status);
+      if (source.amount) totalAmount += source.amount;
+      if (hit._score) avgScore += hit._score;
+    });
+
+    avgScore = totalResults > 0 ? avgScore / totalResults : 0;
+
+    return {
+      totalResults,
+      loanTypes: Array.from(loanTypes),
+      statuses: Array.from(statuses),
+      totalAmount,
+      avgScore,
+      summary: `${totalResults} results across ${loanTypes.size} loan types with ${statuses.size} different statuses`
+    };
+  }
+
+  private getContextualErrorResponse(question: string, error: unknown): string {
+    const lowerQuestion = question.toLowerCase();
+    
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    if (errorMessage?.includes('timeout')) {
+      return 'The search is taking longer than usual due to high system load. Please try a more specific query or try again in a moment.';
+    } else if (errorMessage?.includes('index_not_found')) {
+      return 'The loan database is currently being updated. Please try again in a few moments as new data is being indexed.';
+    } else if (lowerQuestion.includes('hello') || lowerQuestion.includes('hi')) {
+      return 'Hello! I\'m experiencing some technical difficulties, but I\'m here to help you with loan applications and banking questions. What would you like to know?';
+    } else {
+      return 'I\'m experiencing some technical difficulties while searching the loan database. Please try rephrasing your question or try again in a moment.';
     }
   }
 }
