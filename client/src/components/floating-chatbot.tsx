@@ -91,8 +91,8 @@ export function FloatingChatbot() {
 
       {/* Chat Window */}
       {isOpen && (
-        <Card className={`fixed bottom-6 right-6 z-50 w-[450px] max-w-[95vw] shadow-xl transition-all duration-300 ${
-          isMinimized ? 'h-16' : 'h-[600px]'
+        <Card className={`fixed bottom-6 right-6 z-50 w-[400px] max-w-[90vw] shadow-xl transition-all duration-300 ${
+          isMinimized ? 'h-16' : 'h-[550px]'
         }`}>
           <CardHeader className="pb-3 flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-base">
@@ -121,7 +121,7 @@ export function FloatingChatbot() {
           
           {!isMinimized && (
             <CardContent className="flex-1 flex flex-col gap-4 p-4 pt-0">
-              <ScrollArea className="flex-1 pr-2 h-[420px]" ref={scrollAreaRef}>
+              <ScrollArea className="flex-1 pr-2 h-[380px] overflow-y-auto" ref={scrollAreaRef}>
                 <div className="space-y-4">
                   {messages.map((message) => (
                     <div
@@ -133,34 +133,34 @@ export function FloatingChatbot() {
                           <Bot className="h-4 w-4 text-white" />
                         </div>
                       )}
-                      <div className={`max-w-[90%] ${message.type === 'user' ? 'order-first' : ''}`}>
+                      <div className={`max-w-[85%] ${message.type === 'user' ? 'order-first' : ''}`}>
                         <div
-                          className={`p-3 rounded-lg text-sm leading-relaxed ${
+                          className={`p-2 rounded-lg text-xs leading-5 ${
                             message.type === 'user'
                               ? 'bg-blue-500 text-white ml-auto'
                               : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
                           }`}
                         >
-                          <div className="chatbot-response whitespace-pre-wrap">
+                          <div className="floating-chatbot-text">
                             {formatBotResponse(message.content)}
                           </div>
                           {message.sources && message.sources.length > 0 && (
-                            <div className="mt-3 pt-2 border-t border-gray-200 dark:border-gray-700">
-                              <div className="text-xs text-gray-600 dark:text-gray-400 mb-2 font-medium">Data Sources:</div>
+                            <div className="mt-2 pt-1 border-t border-gray-200 dark:border-gray-700">
+                              <div className="text-xs text-gray-600 dark:text-gray-400 mb-1 font-medium">Data Sources:</div>
                               <div className="space-y-1">
-                                {message.sources.slice(0, 3).map((source) => (
-                                  <div key={source.position} className="text-xs bg-gray-50 dark:bg-gray-700 p-2 rounded border-l-2 border-blue-400">
-                                    <div className="font-medium text-gray-700 dark:text-gray-300">
+                                {message.sources.slice(0, 2).map((source) => (
+                                  <div key={source.position} className="text-xs bg-gray-50 dark:bg-gray-700 p-1 rounded border-l-2 border-blue-400">
+                                    <div className="font-medium text-gray-700 dark:text-gray-300 truncate">
                                       {source.customerName} - {source.loanType}
                                     </div>
-                                    <div className="text-gray-500 dark:text-gray-400">
-                                      ID: {source.applicationId} | Score: {source.score?.toFixed(2)}
+                                    <div className="text-gray-500 dark:text-gray-400 text-xs truncate">
+                                      ID: {source.applicationId}
                                     </div>
                                   </div>
                                 ))}
-                                {message.sources.length > 3 && (
+                                {message.sources.length > 2 && (
                                   <div className="text-xs text-gray-500 dark:text-gray-400 italic">
-                                    ...and {message.sources.length - 3} more sources
+                                    +{message.sources.length - 2} more sources
                                   </div>
                                 )}
                               </div>

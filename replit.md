@@ -181,6 +181,12 @@ The system requires several environment variables:
 - ✅ Added markdown formatting cleanup for cleaner chat display
 - ✅ Improved scrollable area height (420px) for better message viewing
 - ✅ Enhanced natural language output formatting for English responses
+- ✅ Fixed floating chatbot text overflow and wrapping issues for proper display within response panel
+- ✅ Reduced floating chatbot window size (400px width, 550px height) for better mobile compatibility
+- ✅ Added specific CSS class for floating chatbot text with smaller font size (12px) and improved line height
+- ✅ Enhanced source citation display with truncated text and compact formatting
+- ✅ Improved scrollable area with explicit overflow-y-auto for better message viewing
+- ✅ Optimized message padding and spacing for floating chatbot interface
 
 ### Unique Customer Names for Loan Applications (July 17, 2025)
 - ✅ Updated loan application generation to create unique customer names for each application
