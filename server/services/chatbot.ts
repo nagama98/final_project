@@ -145,6 +145,212 @@ export class ChatbotService {
     return {};
   }
 
+  private parseQueryConditions(question: string): string {
+    const conditions = [];
+    const lowerQuestion = question.toLowerCase();
+    
+    // Extract loan type
+    if (lowerQuestion.includes('business')) conditions.push('loan type: business');
+    if (lowerQuestion.includes('personal')) conditions.push('loan type: personal');
+    if (lowerQuestion.includes('mortgage')) conditions.push('loan type: mortgage');
+    if (lowerQuestion.includes('auto')) conditions.push('loan type: auto');
+    if (lowerQuestion.includes('student')) conditions.push('loan type: student');
+    
+    // Extract status
+    if (lowerQuestion.includes('approved')) conditions.push('status: approved');
+    if (lowerQuestion.includes('pending')) conditions.push('status: pending');
+    if (lowerQuestion.includes('rejected')) conditions.push('status: rejected');
+    
+    // Extract amount conditions
+    const amountMatch = question.match(/(\$?[\d,]+)/);
+    if (amountMatch) {
+      const amount = amountMatch[1];
+      if (lowerQuestion.includes('above') || lowerQuestion.includes('over')) {
+        conditions.push(`amount above ${amount}`);
+      } else if (lowerQuestion.includes('below') || lowerQuestion.includes('under')) {
+        conditions.push(`amount below ${amount}`);
+      }
+    }
+    
+    // Extract risk score conditions
+    const riskMatch = question.match(/risk\s+score\s+(\w+)\s+(\d+)/i);
+    if (riskMatch) {
+      conditions.push(`risk score ${riskMatch[1]} ${riskMatch[2]}`);
+    }
+    
+    return conditions.length > 0 ? conditions.join(', ') : 'all loan applications';
+  }
+
+  private async getFullIndexStats(conditions: string): Promise<any> {
+    try {
+      // Build search query based on conditions
+      const searchQuery = this.buildSearchQuery(conditions);
+      
+      // Get total documents count
+      const totalCount = await elasticsearch.countDocuments(this.indexName);
+      
+      // Get matching documents count and stats
+      const stats = await elasticsearch.getComprehensiveStats(this.indexName, searchQuery);
+      
+      return {
+        totalInIndex: totalCount,
+        totalMatching: stats.totalMatching,
+        aggregations: stats.aggregations,
+        conditions: conditions
+      };
+    } catch (error) {
+      console.error('Failed to get full index stats:', error);
+      return {
+        totalInIndex: 0,
+        totalMatching: 0,
+        aggregations: {},
+        conditions: conditions
+      };
+    }
+  }
+
+  private buildSearchQuery(conditions: string): any {
+    const query = { bool: { must: [] } };
+    
+    if (conditions === 'all loan applications') {
+      return { match_all: {} };
+    }
+    
+    const lowerConditions = conditions.toLowerCase();
+    
+    // Add loan type filter
+    if (lowerConditions.includes('business')) {
+      query.bool.must.push({ term: { 'loanType.keyword': 'business' } });
+    }
+    if (lowerConditions.includes('personal')) {
+      query.bool.must.push({ term: { 'loanType.keyword': 'personal' } });
+    }
+    if (lowerConditions.includes('mortgage')) {
+      query.bool.must.push({ term: { 'loanType.keyword': 'mortgage' } });
+    }
+    if (lowerConditions.includes('auto')) {
+      query.bool.must.push({ term: { 'loanType.keyword': 'auto' } });
+    }
+    if (lowerConditions.includes('student')) {
+      query.bool.must.push({ term: { 'loanType.keyword': 'student' } });
+    }
+    
+    // Add status filter
+    if (lowerConditions.includes('approved')) {
+      query.bool.must.push({ term: { 'status.keyword': 'approved' } });
+    }
+    if (lowerConditions.includes('pending')) {
+      query.bool.must.push({ term: { 'status.keyword': 'pending' } });
+    }
+    if (lowerConditions.includes('rejected')) {
+      query.bool.must.push({ term: { 'status.keyword': 'rejected' } });
+    }
+    
+    // Add amount range filter
+    const amountMatch = conditions.match(/amount\s+(above|below)\s+\$?([0-9,]+)/);
+    if (amountMatch) {
+      const amount = parseInt(amountMatch[2].replace(/,/g, ''));
+      if (amountMatch[1] === 'above') {
+        query.bool.must.push({ range: { amount: { gte: amount } } });
+      } else {
+        query.bool.must.push({ range: { amount: { lte: amount } } });
+      }
+    }
+    
+    // Add risk score filter
+    const riskMatch = conditions.match(/risk\s+score\s+(above|below)\s+(\d+)/);
+    if (riskMatch) {
+      const score = parseInt(riskMatch[2]);
+      if (riskMatch[1] === 'above') {
+        query.bool.must.push({ range: { riskScore: { gte: score } } });
+      } else {
+        query.bool.must.push({ range: { riskScore: { lte: score } } });
+      }
+    }
+    
+    return query.bool.must.length > 0 ? query : { match_all: {} };
+  }
+
+  private createComprehensiveContext(searchResults: any[], stats: any): string {
+    let context = `COMPREHENSIVE ANALYSIS RESULTS:\n`;
+    context += `Total matching records: ${stats.totalMatching}\n`;
+    context += `Total records in database: ${stats.totalInIndex}\n`;
+    context += `Query conditions: ${stats.conditions}\n\n`;
+    
+    // Add aggregation summaries
+    if (stats.aggregations) {
+      if (stats.aggregations.loan_types) {
+        context += `LOAN TYPES BREAKDOWN:\n`;
+        stats.aggregations.loan_types.buckets.forEach((bucket: any) => {
+          context += `- ${bucket.key}: ${bucket.doc_count} applications\n`;
+        });
+        context += '\n';
+      }
+      
+      if (stats.aggregations.statuses) {
+        context += `STATUS BREAKDOWN:\n`;
+        stats.aggregations.statuses.buckets.forEach((bucket: any) => {
+          context += `- ${bucket.key}: ${bucket.doc_count} applications\n`;
+        });
+        context += '\n';
+      }
+      
+      if (stats.aggregations.total_amount) {
+        context += `TOTAL LOAN AMOUNT: $${stats.aggregations.total_amount.value.toLocaleString()}\n\n`;
+      }
+    }
+    
+    context += `EXAMPLE LOAN APPLICATIONS (showing ${Math.min(4, searchResults.length)} examples):\n\n`;
+    
+    // Add detailed examples
+    for (let i = 0; i < Math.min(4, searchResults.length); i++) {
+      const hit = searchResults[i];
+      const source = hit._source;
+      
+      context += `${i + 1}. ${source.customerName} - ${source.loanType}\n`;
+      context += `   Application ID: ${source.applicationId}\n`;
+      context += `   Amount: $${source.amount?.toLocaleString()}\n`;
+      context += `   Status: ${source.status}\n`;
+      context += `   Risk Score: ${source.riskScore}\n`;
+      context += `   Purpose: ${source.purpose}\n\n`;
+    }
+    
+    return context;
+  }
+
+  private async generateComprehensiveResponse(context: string, question: string, stats: any): Promise<string> {
+    const prompt = `You are an AI assistant for ElastiBank's loan management system. Provide a comprehensive summary based on the search results.
+
+SEARCH QUERY: "${question}"
+
+${context}
+
+INSTRUCTIONS:
+1. Start with a clear summary: "I found [X] loan applications matching your criteria out of [Y] total applications in the database."
+2. Provide key statistics and breakdowns when available
+3. List 3-4 specific examples with key details
+4. Keep the response conversational and easy to read
+5. Format loan amounts properly ($50,000)
+6. End with an offer to provide more specific information
+
+Focus on being informative and comprehensive while maintaining readability.`;
+
+    try {
+      const response = await openai.generateChatCompletion([
+        { role: 'system', content: prompt },
+        { role: 'user', content: question }
+      ], {
+        temperature: 0.3,
+        max_tokens: 500
+      });
+      
+      return response || 'I apologize, but I could not generate a comprehensive response at this time.';
+    } catch (error) {
+      console.error('Failed to generate comprehensive response:', error);
+      return this.generateFallbackResponse(question);
+    }
+  }
+
   createContextPrompt(searchResults: any[], metadata?: any): string {
     let context = '';
     
@@ -247,30 +453,39 @@ Remember: Focus on clarity, readability, and natural conversation flow.`;
     metadata?: any;
   }> {
     const startTime = Date.now();
-    console.log(`🤖 Processing chatbot query: "${question}"`);
+    console.log(`🤖 Processing comprehensive chatbot query: "${question}"`);
     
     try {
-      // Search Elasticsearch with enhanced logging
+      // Parse the query to understand what the user wants
+      const queryConditions = this.parseQueryConditions(question);
+      console.log(`📋 Parsed conditions: ${queryConditions}`);
+      
+      // Get comprehensive statistics from entire index
+      console.log('📊 Getting comprehensive statistics from entire index...');
+      const comprehensiveStats = await this.getFullIndexStats(queryConditions);
+      
+      // Get specific examples for the query
       const searchResults = await this.searchElasticsearch(question);
+      
       const searchTime = Date.now() - startTime;
-      console.log(`📊 Search completed in ${searchTime}ms - Found ${searchResults.length} relevant results`);
+      console.log(`✅ Comprehensive analysis completed: Found ${comprehensiveStats.totalMatching} matching records out of ${comprehensiveStats.totalInIndex} total`);
       
-      // Analyze search results for better context
-      const metadata = this.analyzeSearchResults(searchResults, question);
-      console.log(`📈 Search analysis: ${metadata.summary}`);
+      // Generate enhanced context with full statistics
+      const context = this.createComprehensiveContext(searchResults, comprehensiveStats);
       
-      // Create enhanced context prompt
-      const contextPrompt = this.createContextPrompt(searchResults, metadata);
-      
-      // Generate AI response with timing
+      // Generate AI response with comprehensive data
+      console.log('🧠 Generating comprehensive AI response...');
       const responseStartTime = Date.now();
-      console.log('🧠 Generating AI response...');
-      const answer = await this.generateResponse(contextPrompt, question);
+      
+      const response = await this.generateComprehensiveResponse(context, question, comprehensiveStats);
+      
       const responseTime = Date.now() - responseStartTime;
-      console.log(`💬 Response generated in ${responseTime}ms`);
+      const totalTime = Date.now() - startTime;
+      console.log(`💬 Comprehensive response generated in ${responseTime}ms`);
+      console.log(`✅ Full query processing completed in ${totalTime}ms`);
       
       // Extract enhanced sources for citation
-      const sources = searchResults.slice(0, 5).map((hit, index) => ({
+      const sources = searchResults.slice(0, 4).map((hit, index) => ({
         position: index + 1,
         applicationId: hit._source.applicationId,
         customerName: hit._source.customerName,
@@ -280,23 +495,22 @@ Remember: Focus on clarity, readability, and natural conversation flow.`;
         score: hit._score
       }));
       
-      const totalTime = Date.now() - startTime;
-      console.log(`✅ Query processing completed in ${totalTime}ms`);
-      
       return {
-        answer,
+        answer: response,
         sources,
-        searchResults: searchResults.slice(0, 5),
+        searchResults: searchResults.slice(0, 4),
         metadata: {
-          ...metadata,
+          totalMatching: comprehensiveStats.totalMatching,
+          totalInIndex: comprehensiveStats.totalInIndex,
+          conditions: queryConditions,
           processingTime: totalTime,
-          searchTime,
-          responseTime
+          searchTime: searchTime,
+          responseTime: responseTime
         }
       };
     } catch (error) {
       const errorTime = Date.now() - startTime;
-      console.error(`❌ Chatbot processing failed after ${errorTime}ms:`, error);
+      console.error(`❌ Comprehensive query processing failed after ${errorTime}ms:`, error);
       
       // Provide contextual error response
       const errorResponse = this.getContextualErrorResponse(question, error);

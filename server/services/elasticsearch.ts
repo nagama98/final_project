@@ -156,6 +156,53 @@ export class ElasticsearchService {
     }
   }
 
+  async getComprehensiveStats(indexName: string, searchQuery: any): Promise<any> {
+    try {
+      // Get total count and aggregations for comprehensive analysis
+      const statsQuery = {
+        query: searchQuery,
+        size: 0,
+        aggs: {
+          loan_types: {
+            terms: { field: 'loanType.keyword', size: 20 }
+          },
+          statuses: {
+            terms: { field: 'status.keyword', size: 20 }
+          },
+          risk_ranges: {
+            range: {
+              field: 'riskScore',
+              ranges: [
+                { key: 'low', to: 30 },
+                { key: 'medium', from: 30, to: 70 },
+                { key: 'high', from: 70 }
+              ]
+            }
+          },
+          amount_stats: {
+            stats: { field: 'amount' }
+          },
+          total_amount: {
+            sum: { field: 'amount' }
+          }
+        }
+      };
+
+      const result = await this.client.search({
+        index: indexName,
+        ...statsQuery
+      });
+
+      return {
+        totalMatching: result.hits.total.value || result.hits.total,
+        aggregations: result.aggregations
+      };
+    } catch (error) {
+      console.error('Failed to get comprehensive stats:', error);
+      throw error;
+    }
+  }
+
   async bulkIndex(indexName: string, documents: any[]): Promise<void> {
     try {
       if (documents.length === 0) return;
