@@ -91,8 +91,8 @@ export function FloatingChatbot() {
 
       {/* Chat Window */}
       {isOpen && (
-        <Card className={`fixed bottom-6 right-6 z-50 w-[400px] max-w-[90vw] shadow-xl transition-all duration-300 ${
-          isMinimized ? 'h-16' : 'h-[550px]'
+        <Card className={`fixed bottom-6 right-6 z-50 w-[420px] max-w-[95vw] shadow-xl transition-all duration-300 ${
+          isMinimized ? 'h-16' : 'h-[600px]'
         }`}>
           <CardHeader className="pb-3 flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-base">
@@ -120,9 +120,9 @@ export function FloatingChatbot() {
           </CardHeader>
           
           {!isMinimized && (
-            <CardContent className="flex-1 flex flex-col gap-4 p-4 pt-0">
-              <ScrollArea className="flex-1 pr-2 h-[380px] overflow-y-auto" ref={scrollAreaRef}>
-                <div className="space-y-4">
+            <CardContent className="flex-1 flex flex-col gap-3 p-4 pt-0 max-h-[520px]">
+              <ScrollArea className="flex-1 pr-2 h-[420px] overflow-y-auto border rounded-md bg-gray-50 dark:bg-gray-900 floating-chatbot-scroll" ref={scrollAreaRef}>
+                <div className="space-y-3 p-3">
                   {messages.map((message) => (
                     <div
                       key={message.id}
@@ -133,15 +133,15 @@ export function FloatingChatbot() {
                           <Bot className="h-4 w-4 text-white" />
                         </div>
                       )}
-                      <div className={`max-w-[90%] ${message.type === 'user' ? 'order-first' : ''}`}>
+                      <div className={`max-w-[85%] ${message.type === 'user' ? 'order-first' : ''}`}>
                         <div
-                          className={`p-2 rounded-lg text-xs leading-5 ${
+                          className={`p-3 rounded-lg shadow-sm ${
                             message.type === 'user'
                               ? 'bg-blue-500 text-white ml-auto'
-                              : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                              : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700'
                           }`}
                         >
-                          <div className="floating-chatbot-text break-words overflow-wrap-anywhere whitespace-pre-wrap">
+                          <div className="floating-chatbot-text text-sm leading-relaxed max-w-full overflow-hidden break-words whitespace-pre-wrap">
                             {formatBotResponse(message.content)}
                           </div>
                           {message.sources && message.sources.length > 0 && (
