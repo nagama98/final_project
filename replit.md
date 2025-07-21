@@ -168,6 +168,13 @@ The system requires several environment variables:
 - ✅ Improved error handling with contextual error responses
 - ✅ Added processing time tracking for search and response generation
 - ✅ Upgraded search to support wildcard, phrase, and range queries
+- ✅ Fixed chatbot UI blank response issue by correcting JSON response parsing
+- ✅ Enhanced chatbot response formatting with improved word wrapping and readability
+- ✅ Increased chatbot window size to 420px width and 550px height for better visibility
+- ✅ Improved source citation display with enhanced formatting and visual design
+- ✅ Created reusable ChatbotService for consistent behavior across all chatbot components
+- ✅ Updated both floating chatbot and main chatbot component with unified logic
+- ✅ Enhanced message display with better text wrapping and overflow handling
 
 ### Unique Customer Names for Loan Applications (July 17, 2025)
 - ✅ Updated loan application generation to create unique customer names for each application
