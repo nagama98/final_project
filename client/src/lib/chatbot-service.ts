@@ -72,9 +72,12 @@ export class ChatbotService {
 
 // Helper function to format bot responses with better readability
 export const formatBotResponse = (content: string): string => {
-  // Clean up and format the response text
+  // Clean up and format the response text for better chat display
   return content
-    .replace(/\n\n/g, '\n\n')  // Preserve paragraph breaks
-    .replace(/\n/g, '\n')      // Preserve line breaks
+    .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove markdown bold formatting
+    .replace(/\*(.*?)\*/g, '$1')      // Remove markdown italic formatting
+    .replace(/\n\s*\n\s*\n/g, '\n\n') // Reduce excessive line breaks
+    .replace(/^\s+|\s+$/g, '')        // Trim whitespace
+    .replace(/\s{2,}/g, ' ')          // Reduce multiple spaces to single
     .trim();
 };

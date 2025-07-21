@@ -91,8 +91,8 @@ export function FloatingChatbot() {
 
       {/* Chat Window */}
       {isOpen && (
-        <Card className={`fixed bottom-6 right-6 z-50 w-[420px] max-w-[90vw] shadow-xl transition-all duration-300 ${
-          isMinimized ? 'h-16' : 'h-[550px]'
+        <Card className={`fixed bottom-6 right-6 z-50 w-[450px] max-w-[95vw] shadow-xl transition-all duration-300 ${
+          isMinimized ? 'h-16' : 'h-[600px]'
         }`}>
           <CardHeader className="pb-3 flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-base">
@@ -121,7 +121,7 @@ export function FloatingChatbot() {
           
           {!isMinimized && (
             <CardContent className="flex-1 flex flex-col gap-4 p-4 pt-0">
-              <ScrollArea className="flex-1 pr-4 h-[380px]" ref={scrollAreaRef}>
+              <ScrollArea className="flex-1 pr-2 h-[420px]" ref={scrollAreaRef}>
                 <div className="space-y-4">
                   {messages.map((message) => (
                     <div
@@ -133,7 +133,7 @@ export function FloatingChatbot() {
                           <Bot className="h-4 w-4 text-white" />
                         </div>
                       )}
-                      <div className={`max-w-[85%] ${message.type === 'user' ? 'order-first' : ''}`}>
+                      <div className={`max-w-[90%] ${message.type === 'user' ? 'order-first' : ''}`}>
                         <div
                           className={`p-3 rounded-lg text-sm leading-relaxed ${
                             message.type === 'user'
@@ -141,7 +141,7 @@ export function FloatingChatbot() {
                               : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
                           }`}
                         >
-                          <div className="whitespace-pre-wrap break-words overflow-wrap-anywhere">
+                          <div className="chatbot-response whitespace-pre-wrap">
                             {formatBotResponse(message.content)}
                           </div>
                           {message.sources && message.sources.length > 0 && (

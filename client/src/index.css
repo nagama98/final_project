@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Improved text wrapping for chatbot responses */
+.chatbot-response {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  line-height: 1.5;
+}
+
 :root {
   --background: hsl(250, 100%, 99%);
   --foreground: hsl(20, 14.3%, 4.1%);

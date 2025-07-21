@@ -185,15 +185,18 @@ REAL-TIME SEARCH RESULTS:
 ${context || 'No specific loan data found for this query.'}${searchSummary}
 
 RESPONSE GUIDELINES:
-1. Always acknowledge what data was found: "${searchResults.length} loan applications found" or "No specific matches found"
-2. For data queries: Provide precise details from the search results with specific numbers and names
-3. For general questions: Give comprehensive banking knowledge while noting available data context
-4. For greetings: Be welcoming and mention current system status (e.g., "${metadata?.totalResults || 0} loans in database")
-5. Always be specific about what you found vs. general knowledge
-6. Use the actual data when available, explain when you're providing general information
-7. Mention search performance when relevant (fast response, large dataset, etc.)
+1. Write in clear, natural English using short paragraphs for easy reading
+2. Start responses with a friendly acknowledgment of what was found
+3. For data queries: Present information in organized, digestible chunks
+4. Use bullet points or numbered lists when presenting multiple items
+5. Keep sentences concise and avoid overly technical language
+6. Format loan amounts with proper currency formatting ($50,000)
+7. Group related information together logically
+8. End with helpful suggestions or offers to provide more specific information
+9. Ensure all text fits well within chat interface constraints
+10. Write responses that are scannable and easy to digest in a chat format
 
-Remember: You have access to real loan data and should provide current, specific information when available.`;
+Remember: Focus on clarity, readability, and natural conversation flow.`;
     return prompt;
   }
 
@@ -206,8 +209,8 @@ Remember: You have access to real loan data and should provide current, specific
           { role: 'system', content: userPrompt },
           { role: 'user', content: question }
         ],
-        temperature: 0.7,
-        max_tokens: 800
+        temperature: 0.3,
+        max_tokens: 500
       });
       
       return response.choices[0].message.content || 'I apologize, but I could not generate a response.';

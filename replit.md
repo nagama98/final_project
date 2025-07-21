@@ -175,6 +175,12 @@ The system requires several environment variables:
 - ✅ Created reusable ChatbotService for consistent behavior across all chatbot components
 - ✅ Updated both floating chatbot and main chatbot component with unified logic
 - ✅ Enhanced message display with better text wrapping and overflow handling
+- ✅ Improved chatbot window size (450px width, 600px height) for better content visibility
+- ✅ Enhanced text formatting with CSS class for consistent word wrapping and line height
+- ✅ Optimized AI response settings (temperature 0.3, max_tokens 500) for concise responses
+- ✅ Added markdown formatting cleanup for cleaner chat display
+- ✅ Improved scrollable area height (420px) for better message viewing
+- ✅ Enhanced natural language output formatting for English responses
 
 ### Unique Customer Names for Loan Applications (July 17, 2025)
 - ✅ Updated loan application generation to create unique customer names for each application

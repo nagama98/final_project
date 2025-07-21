@@ -81,7 +81,7 @@ export function Chatbot() {
                     <Bot className="h-4 w-4 text-white" />
                   </div>
                 )}
-                <div className={`max-w-[85%] ${message.type === 'user' ? 'order-first' : ''}`}>
+                <div className={`max-w-[90%] ${message.type === 'user' ? 'order-first' : ''}`}>
                   <div
                     className={`p-3 rounded-lg ${
                       message.type === 'user'
@@ -89,7 +89,7 @@ export function Chatbot() {
                         : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
                     }`}
                   >
-                    <div className="text-sm whitespace-pre-wrap break-words overflow-wrap-anywhere leading-relaxed">
+                    <div className="chatbot-response text-sm whitespace-pre-wrap">
                       {formatBotResponse(message.content)}
                     </div>
                     {message.sources && message.sources.length > 0 && (
