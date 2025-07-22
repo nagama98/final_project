@@ -241,7 +241,7 @@ export class ChatbotService {
   }
 
   private buildSearchQuery(conditions: string): any {
-    const query = { bool: { must: [] } };
+    const query = { bool: { must: [] as any[] } };
     
     if (conditions === 'all loan applications') {
       return { match_all: {} };
@@ -251,30 +251,30 @@ export class ChatbotService {
     
     // Add loan type filter
     if (lowerConditions.includes('business')) {
-      query.bool.must.push({ term: { 'loanType.keyword': 'business' } });
+      query.bool.must.push({ term: { 'loanType': 'business' } });
     }
     if (lowerConditions.includes('personal')) {
-      query.bool.must.push({ term: { 'loanType.keyword': 'personal' } });
+      query.bool.must.push({ term: { 'loanType': 'personal' } });
     }
     if (lowerConditions.includes('mortgage')) {
-      query.bool.must.push({ term: { 'loanType.keyword': 'mortgage' } });
+      query.bool.must.push({ term: { 'loanType': 'mortgage' } });
     }
     if (lowerConditions.includes('auto')) {
-      query.bool.must.push({ term: { 'loanType.keyword': 'auto' } });
+      query.bool.must.push({ term: { 'loanType': 'auto' } });
     }
     if (lowerConditions.includes('student')) {
-      query.bool.must.push({ term: { 'loanType.keyword': 'student' } });
+      query.bool.must.push({ term: { 'loanType': 'student' } });
     }
     
     // Add status filter
     if (lowerConditions.includes('approved')) {
-      query.bool.must.push({ term: { 'status.keyword': 'approved' } });
+      query.bool.must.push({ term: { 'status': 'approved' } });
     }
     if (lowerConditions.includes('pending')) {
-      query.bool.must.push({ term: { 'status.keyword': 'pending' } });
+      query.bool.must.push({ term: { 'status': 'pending' } });
     }
     if (lowerConditions.includes('rejected')) {
-      query.bool.must.push({ term: { 'status.keyword': 'rejected' } });
+      query.bool.must.push({ term: { 'status': 'rejected' } });
     }
     
     // Add amount range filter with better parsing
@@ -444,7 +444,7 @@ Remember: Focus on clarity, readability, and natural conversation flow.`;
 
   async generateResponse(userPrompt: string, question: string): Promise<string> {
     try {
-      // Use Azure OpenAI directly with the client
+      // Use OpenAI API with fallback handling
       const response = await openai.client.chat.completions.create({
         model: openai.getChatModel(),
         messages: [
@@ -457,28 +457,60 @@ Remember: Focus on clarity, readability, and natural conversation flow.`;
       
       return response.choices[0].message.content || 'I apologize, but I could not generate a response.';
     } catch (error) {
-      console.error('Azure OpenAI completion failed:', error);
+      console.error('OpenAI completion failed:', error);
       
-      // Provide intelligent fallback responses for all types of questions
-      const lowerQuestion = question.toLowerCase();
+      // Enhanced intelligent fallback that analyzes loan data directly
+      return this.generateIntelligentFallbackResponse(question);
+    }
+  }
+
+  private async generateIntelligentFallbackResponse(question: string): Promise<string> {
+    const lowerQuestion = question.toLowerCase();
+    
+    try {
+      // Try to get basic loan statistics for context
+      const totalCount = await this.getTotalApplicationsCount();
       
+      // Analyze question type and provide data-driven responses
       if (lowerQuestion.includes('hello') || lowerQuestion.includes('hi') || lowerQuestion.includes('hey')) {
-        return 'Hello! I\'m your AI assistant for ElastiBank. I can help you with loan applications, customer information, banking processes, and answer any questions about our loan management system. What would you like to know?';
-      } else if (lowerQuestion.includes('help') || lowerQuestion.includes('what can you do')) {
-        return 'I can help you with:\n\n✓ Search and analyze loan applications\n✓ Find customer information and loan histories\n✓ Explain banking processes and loan terms\n✓ Calculate loan statistics and metrics\n✓ Provide insights on risk assessment and approval processes\n✓ Answer questions about loan types, interest rates, and terms\n\nWhat specific information are you looking for?';
-      } else if (lowerQuestion.includes('how many') || lowerQuestion.includes('count') || lowerQuestion.includes('total')) {
-        return 'I can help you calculate statistics from our loan data. For current totals, the dashboard shows our latest metrics. You can also ask me about specific counts like "how many approved loans" or "total mortgage applications" and I\'ll search through our database for precise numbers.';
-      } else if (lowerQuestion.includes('customer') || lowerQuestion.includes('client')) {
-        return 'I can help you find information about customers and their loan applications. Try asking about specific customer names, credit scores, or loan histories. For example: "Show me customers with high credit scores" or "Find customers with multiple loans."';
-      } else if (lowerQuestion.includes('loan') || lowerQuestion.includes('application') || lowerQuestion.includes('mortgage') || lowerQuestion.includes('personal') || lowerQuestion.includes('auto')) {
-        return 'I can help you search through loan applications by type, status, amount, or customer. Try asking questions like "Show me pending mortgage loans" or "Find loans above $50,000" or "What are the current interest rates?"';
-      } else if (lowerQuestion.includes('approve') || lowerQuestion.includes('reject') || lowerQuestion.includes('status')) {
-        return 'I can help you understand loan approval processes, check application statuses, and explain our risk assessment criteria. Ask me about specific loan statuses or approval rates for different loan types.';
-      } else if (lowerQuestion.includes('risk') || lowerQuestion.includes('credit') || lowerQuestion.includes('score')) {
-        return 'I can explain our risk assessment process, credit score requirements, and help you analyze loan risk profiles. Ask me about risk factors, credit score distributions, or specific risk categories.';
-      } else {
-        return 'I\'m here to help with any banking and loan-related questions! I can search loan applications, explain banking processes, help with customer inquiries, and provide insights about our loan portfolio. What would you like to know about?';
+        return `Hello! I'm your AI assistant for ElastiBank with access to ${totalCount.toLocaleString()} loan applications. I can help you search applications, analyze loan data, explain banking processes, and answer questions about our loan portfolio. What would you like to know?`;
+      } 
+      
+      if (lowerQuestion.includes('help') || lowerQuestion.includes('what can you do')) {
+        return `I can help you with our ${totalCount.toLocaleString()} loan applications:\n\n✓ Search by customer name, loan type, amount, or status\n✓ Calculate statistics and generate reports\n✓ Find specific applications and analyze trends\n✓ Explain loan terms, interest rates, and approval processes\n✓ Provide insights on risk assessment and portfolio analysis\n\nTry asking: "Show me approved mortgage loans" or "How many loans above $50,000?"`;
       }
+      
+      if (lowerQuestion.includes('total') || lowerQuestion.includes('count') || lowerQuestion.includes('how many') || lowerQuestion.includes('all applications')) {
+        return `**Total: ${totalCount.toLocaleString()} loan applications in the database**\n\nOur loan portfolio includes various types: personal loans, mortgages, auto loans, business loans, and student loans. Each application includes detailed information about the customer, loan amount, status, risk assessment, and more.\n\nFor specific counts, try asking: "How many approved loans?" or "Show me mortgage applications."`;
+      }
+      
+      if (lowerQuestion.includes('above') || lowerQuestion.includes('below') || /\$?[0-9,]+/.test(lowerQuestion)) {
+        return `I can search through all ${totalCount.toLocaleString()} loan applications by amount range. Our loans range from small personal loans to large business and mortgage applications.\n\nFor example, try: "Show me loans above $100,000" or "Find applications below $25,000" to get specific results with detailed breakdowns.`;
+      }
+      
+      if (lowerQuestion.includes('customer') || lowerQuestion.includes('client')) {
+        return `I can help you search through customer information across all ${totalCount.toLocaleString()} loan applications. Each application includes customer details like name, credit score, income, and loan history.\n\nTry asking: "Find customer John Smith" or "Show me customers with high credit scores" for specific results.`;
+      }
+      
+      if (lowerQuestion.includes('approved') || lowerQuestion.includes('pending') || lowerQuestion.includes('rejected')) {
+        const status = lowerQuestion.includes('approved') ? 'approved' : lowerQuestion.includes('pending') ? 'pending' : 'rejected';
+        return `I can search for ${status} loan applications in our database of ${totalCount.toLocaleString()} applications. Each status category provides insights into our loan processing and approval rates.\n\nFor detailed results, try: "Show me all ${status} loans" or "How many ${status} mortgage applications?"`;
+      }
+      
+      if (lowerQuestion.includes('mortgage') || lowerQuestion.includes('personal') || lowerQuestion.includes('auto') || lowerQuestion.includes('business') || lowerQuestion.includes('student')) {
+        const loanType = lowerQuestion.includes('mortgage') ? 'mortgage' : 
+                         lowerQuestion.includes('personal') ? 'personal' :
+                         lowerQuestion.includes('auto') ? 'auto' :
+                         lowerQuestion.includes('business') ? 'business' : 'student';
+        return `I can search for ${loanType} loan applications in our database of ${totalCount.toLocaleString()} total applications. Each loan type has different characteristics, terms, and approval criteria.\n\nTry asking: "Show me all ${loanType} loans" or "How many ${loanType} applications are approved?" for specific analysis.`;
+      }
+      
+      // Default response with current data context
+      return `I'm here to help you analyze our ${totalCount.toLocaleString()} loan applications! I can search by customer name, loan type, amount, status, or any combination of criteria.\n\nPopular queries:\n• "Show me approved business loans"\n• "Find loans above $75,000"\n• "How many pending applications?"\n• "Search for customer Smith"\n\nWhat would you like to explore?`;
+      
+    } catch (error) {
+      // Final fallback without data context
+      return 'I\'m here to help with loan applications and banking questions! I can search through our loan database, explain banking processes, and help with customer inquiries. What would you like to know about?';
     }
   }
 
@@ -557,9 +589,35 @@ Remember: Focus on clarity, readability, and natural conversation flow.`;
         
         console.log(`📊 Count-based search: Found ${searchResults.length} sample results out of ${totalResults} total applications`);
       } else {
-        // Regular semantic search
-        searchResults = await this.searchElasticsearch(question);
-        totalResults = searchResults.length;
+        // Enhanced comprehensive search for all types of questions
+        console.log(`🔍 Processing general query: "${question}"`);
+        
+        // Check if it's a specific search query vs general banking question
+        const isDataSearchQuery = this.isDataSearchQuery(question);
+        
+        if (isDataSearchQuery) {
+          // Search Elasticsearch for specific data
+          searchResults = await this.searchElasticsearch(question);
+          totalResults = searchResults.length;
+          
+          // If no results from semantic search, try broader search
+          if (searchResults.length === 0) {
+            console.log('🔄 No results from semantic search, trying broader search...');
+            const broadResults = await this.performBroadSearch(question);
+            searchResults = broadResults.hits || [];
+            totalResults = broadResults.total || 0;
+          }
+        } else {
+          // For general banking questions, get some sample data for context
+          console.log('💬 General banking question detected, getting sample data...');
+          const sampleResult = await elasticsearch.search(this.indexName, {
+            query: { match_all: {} },
+            size: 10,
+            sort: [{ "createdAt": { "order": "desc" } }]
+          });
+          searchResults = sampleResult.hits.hits;
+          totalResults = await this.getTotalApplicationsCount();
+        }
       }
       
       const searchTime = Date.now() - startTime;
@@ -694,6 +752,107 @@ Remember: Focus on clarity, readability, and natural conversation flow.`;
     } else {
       return 'I\'m experiencing some technical difficulties while searching the loan database. Please try rephrasing your question or try again in a moment.';
     }
+  }
+
+  private isDataSearchQuery(question: string): boolean {
+    const lowerQuestion = question.toLowerCase();
+    
+    // Data search indicators
+    const searchKeywords = [
+      'show me', 'find', 'search', 'get', 'list', 'display',
+      'above', 'below', 'over', 'under', 'greater', 'less',
+      'customer', 'loan', 'application', 'approved', 'pending', 'rejected',
+      'mortgage', 'personal', 'auto', 'business', 'student',
+      'how many', 'count', 'total', 'statistics', 'breakdown',
+      'with', 'having', 'where', 'by'
+    ];
+    
+    const hasAmount = /\$?[0-9,]+/.test(question);
+    const hasDataKeyword = searchKeywords.some(keyword => lowerQuestion.includes(keyword));
+    
+    // General banking questions (not data searches)
+    const generalKeywords = [
+      'what is', 'how does', 'why', 'explain', 'tell me about',
+      'help', 'hello', 'hi', 'what can you', 'definition'
+    ];
+    
+    const hasGeneralKeyword = generalKeywords.some(keyword => lowerQuestion.includes(keyword));
+    
+    // If it has data keywords or amount, it's likely a data search
+    // Unless it's clearly a general question
+    return (hasDataKeyword || hasAmount) && !hasGeneralKeyword;
+  }
+
+  private async performBroadSearch(question: string): Promise<{ hits: any[], total: number }> {
+    try {
+      console.log(`🔍 Performing broad search for: "${question}"`);
+      
+      // Extract key terms from the question
+      const keyTerms = this.extractKeyTerms(question);
+      
+      // Build a comprehensive search query
+      const searchQuery = {
+        query: {
+          bool: {
+            should: [
+              // Match any field with the full question
+              {
+                multi_match: {
+                  query: question,
+                  fields: ['customerName^3', 'loanType^2', 'purpose^2', 'status^1.5', 'description'],
+                  type: 'best_fields',
+                  fuzziness: 'AUTO'
+                }
+              },
+              // Match individual key terms
+              ...keyTerms.map(term => ({
+                multi_match: {
+                  query: term,
+                  fields: ['*'],
+                  type: 'phrase_prefix'
+                }
+              })),
+              // Wildcard searches for customer names
+              {
+                bool: {
+                  should: keyTerms.map(term => ({
+                    wildcard: {
+                      customerName: `*${term.toLowerCase()}*`
+                    }
+                  }))
+                }
+              }
+            ],
+            minimum_should_match: 1
+          }
+        },
+        size: 20,
+        sort: [
+          { _score: { order: 'desc' } },
+          { createdAt: { order: 'desc' } }
+        ]
+      };
+      
+      const result = await elasticsearch.search(this.indexName, searchQuery);
+      return {
+        hits: result.hits.hits,
+        total: result.hits.total?.value || result.hits.total || 0
+      };
+    } catch (error) {
+      console.error('Broad search failed:', error);
+      return { hits: [], total: 0 };
+    }
+  }
+
+  private extractKeyTerms(question: string): string[] {
+    // Remove common words and extract meaningful terms
+    const stopWords = ['show', 'me', 'find', 'get', 'all', 'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by'];
+    const words = question.toLowerCase()
+      .replace(/[^\w\s]/g, ' ')
+      .split(/\s+/)
+      .filter(word => word.length > 2 && !stopWords.includes(word));
+      
+    return [...new Set(words)]; // Remove duplicates
   }
 }
 
