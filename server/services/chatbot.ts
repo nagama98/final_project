@@ -664,18 +664,18 @@ Remember: Focus on clarity, readability, and natural conversation flow.`;
           `\n\nIMPORTANT CONTEXT: Found ${searchResults.length} matching loan applications out of ${totalInDatabase} total applications. Showing detailed results.`;
       }
       
-      // Generate AI response with timing
+      // Generate structured response with count and top 3 documents
       const responseStartTime = Date.now();
-      console.log('🧠 Generating AI response...');
-      const response = await this.generateResponse(contextPrompt, question);
+      console.log('🧠 Generating structured response with count and top 3 documents...');
+      const response = await this.generateStructuredResponse(question, searchResults, totalResults, metadata);
       
       const responseTime = Date.now() - responseStartTime;
       const totalTime = Date.now() - startTime;
-      console.log(`💬 Response generated in ${responseTime}ms`);
+      console.log(`💬 Structured response generated in ${responseTime}ms`);
       console.log(`✅ Query processing completed in ${totalTime}ms`);
       
-      // Extract enhanced sources for citation
-      const sources = searchResults.slice(0, 4).map((hit, index) => ({
+      // Extract top 3 sources for citation (matching the user's requirement)
+      const sources = searchResults.slice(0, 3).map((hit, index) => ({
         position: index + 1,
         applicationId: hit._source.applicationId,
         customerName: hit._source.customerName,
@@ -688,9 +688,10 @@ Remember: Focus on clarity, readability, and natural conversation flow.`;
       return {
         answer: response,
         sources,
-        searchResults: searchResults.slice(0, 4),
+        searchResults: searchResults.slice(0, 3), // Only return top 3 documents
         metadata: {
           ...metadata,
+          totalMatching: totalResults, // Add total matching count
           processingTime: totalTime,
           searchTime,
           responseTime
@@ -755,6 +756,127 @@ Remember: Focus on clarity, readability, and natural conversation flow.`;
       console.error('Error getting total application count:', error);
       return 0;
     }
+  }
+
+  // Generate structured response with total count and top 3 documents
+  private async generateStructuredResponse(
+    question: string, 
+    searchResults: any[], 
+    totalResults: number, 
+    metadata: any
+  ): Promise<string> {
+    try {
+      // Get top 3 documents for LLM context
+      const top3Documents = searchResults.slice(0, 3);
+      
+      if (top3Documents.length === 0) {
+        return `I found 0 matching loan applications for your query "${question}". Please try a different search or check if there are any applications matching your criteria.`;
+      }
+      
+      // Create context with top 3 documents
+      const documentContext = top3Documents.map((hit, index) => {
+        const source = hit._source;
+        return `• Customer: ${source.customerName} - ${source.loanType} loan for $${source.amount} (Status: ${source.status})`;
+      }).join('\n');
+      
+      // Extract query conditions for better context
+      const conditions = this.extractQueryConditions(question);
+      const conditionsText = conditions.length > 0 ? ` matching ${conditions.join(', ')}` : '';
+      
+      // Always use structured fallback for consistent results
+      return this.generateFallbackStructuredResponse(question, totalResults, top3Documents, conditionsText);
+      
+      /* OpenAI integration available but using fallback for consistency
+      if (this.openaiInstance) {
+        try {
+          const prompt = `Based on the loan application search results, provide a response that follows this exact format:
+
+"I found ${totalResults} ${this.getQueryTypeFromQuestion(question)} loan applications${conditionsText}:
+
+${documentContext}
+
+${this.generateAdditionalContext(metadata, totalResults)}"
+
+Question: ${question}
+Context: Top 3 matching applications out of ${totalResults} total matches.`;
+
+          const completion = await this.openaiInstance.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.3,
+            max_tokens: 300
+          });
+          return completion?.choices?.[0]?.message?.content || this.generateFallbackStructuredResponse(question, totalResults, top3Documents, conditionsText);
+          
+        } catch (error) {
+          console.log('OpenAI unavailable, using structured fallback response');
+        }
+      }
+      */
+      
+    } catch (error) {
+      console.error('Error generating structured response:', error);
+      return `I found ${totalResults} loan applications for your query, but encountered an error generating the detailed response. Please try again.`;
+    }
+  }
+
+  // Generate fallback structured response when OpenAI is unavailable
+  private generateFallbackStructuredResponse(
+    question: string, 
+    totalResults: number, 
+    top3Documents: any[], 
+    conditionsText: string
+  ): string {
+    const documentsList = top3Documents.map((hit, index) => {
+      const source = hit._source;
+      return `• Customer: ${source.customerName} - ${source.loanType} loan for $${source.amount} (Status: ${source.status})`;
+    }).join('\n');
+
+    return `I found ${totalResults} ${this.getQueryTypeFromQuestion(question)} loan applications${conditionsText}:
+
+${documentsList}
+
+These are the top 3 results from your search. Each application includes detailed customer information, loan amounts, and current status for your review.`;
+  }
+
+  // Helper method to determine query type from question
+  private getQueryTypeFromQuestion(question: string): string {
+    const lowerQuestion = question.toLowerCase();
+    if (lowerQuestion.includes('approved')) return 'approved';
+    if (lowerQuestion.includes('pending')) return 'pending';
+    if (lowerQuestion.includes('business')) return 'business';
+    if (lowerQuestion.includes('personal')) return 'personal';
+    if (lowerQuestion.includes('mortgage')) return 'mortgage';
+    if (lowerQuestion.includes('auto')) return 'auto';
+    if (lowerQuestion.includes('student')) return 'student';
+    return '';
+  }
+
+  // Extract query conditions for context
+  private extractQueryConditions(question: string): string[] {
+    const conditions: string[] = [];
+    const lowerQuestion = question.toLowerCase();
+    
+    if (lowerQuestion.includes('approved')) conditions.push('approved status');
+    if (lowerQuestion.includes('business')) conditions.push('business loan type');
+    if (lowerQuestion.includes('above') || lowerQuestion.includes('over')) {
+      const amountMatch = question.match(/(?:above|over)\s*\$?([0-9,]+)/i);
+      if (amountMatch) conditions.push(`amount above $${amountMatch[1]}`);
+    }
+    if (lowerQuestion.includes('below') || lowerQuestion.includes('under')) {
+      const amountMatch = question.match(/(?:below|under)\s*\$?([0-9,]+)/i);
+      if (amountMatch) conditions.push(`amount below $${amountMatch[1]}`);
+    }
+    
+    return conditions;
+  }
+
+  // Generate additional context based on metadata
+  private generateAdditionalContext(metadata: any, totalResults: number): string {
+    if (totalResults > 3) {
+      return `These are the top 3 results from ${totalResults} total matches. Use the search filters to narrow down results or view more details.`;
+    }
+    return 'All matching applications are shown above.';
   }
 
   private getContextualErrorResponse(question: string, error: unknown): string {
