@@ -415,11 +415,12 @@ Write concisely for chat interface readability.`;
     const prompt = `You are an AI assistant for ElastiBank, a comprehensive loan management system. You help loan officers, managers, and staff with ALL types of questions about banking, loans, and customer service.
 
 YOUR CAPABILITIES:
-✓ Search and analyze loan applications with real-time data
-✓ Provide detailed explanations about banking processes and loan terms
+✓ Search and analyze loan applications with real-time data  
+✓ Handle complex queries like "show me approved business loans" or "how many loans above risk 80"
+✓ Filter by loan type, status, amount ranges, risk scores, and credit scores
 ✓ Calculate statistics and provide insights from loan portfolios
+✓ Provide detailed explanations about banking processes and loan terms
 ✓ Help with customer inquiries and system guidance
-✓ Explain loan approval processes and risk assessment
 
 REAL-TIME SEARCH RESULTS:
 ${context || 'No specific loan data found for this query.'}${searchSummary}
@@ -541,6 +542,7 @@ Remember: Focus on clarity, readability, and natural conversation flow.`;
       
       let searchResults: any[] = [];
       let totalResults = 0;
+      let complexMetadata: any = null;
       
       if (isAmountQuery) {
         // For amount queries, search the entire index with proper filtering
@@ -592,20 +594,28 @@ Remember: Focus on clarity, readability, and natural conversation flow.`;
         // Enhanced comprehensive search for all types of questions
         console.log(`🔍 Processing general query: "${question}"`);
         
-        // Check if it's a specific search query vs general banking question
-        const isDataSearchQuery = this.isDataSearchQuery(question);
+        // Check if it's a specific search query vs general banking question  
+        const isDataSearchQueryCheck = this.isDataSearchQuery(question);
         
-        if (isDataSearchQuery) {
-          // Search Elasticsearch for specific data
-          searchResults = await this.searchElasticsearch(question);
-          totalResults = searchResults.length;
+        if (isDataSearchQueryCheck) {
+          // Use enhanced complex query processing
+          console.log('🎯 Data search query detected, using complex query processor...');
+          const complexResult = await this.processComplexLoanQuery(question);
+          searchResults = complexResult.hits || [];
+          totalResults = complexResult.total || 0;
           
-          // If no results from semantic search, try broader search
-          if (searchResults.length === 0) {
-            console.log('🔄 No results from semantic search, trying broader search...');
-            const broadResults = await this.performBroadSearch(question);
-            searchResults = broadResults.hits || [];
-            totalResults = broadResults.total || 0;
+          // Store aggregation data for enhanced responses
+          complexMetadata = {
+            aggregations: complexResult.aggregations,
+            isCountQuery: complexResult.isCountQuery
+          };
+          
+          // If no results from complex query, try semantic search as fallback
+          if (searchResults.length === 0 && !complexResult.isCountQuery) {
+            console.log('🔄 No results from complex query, trying semantic search...');
+            const semanticResults = await this.searchElasticsearch(question);
+            searchResults = semanticResults;
+            totalResults = semanticResults.length;
           }
         } else {
           // For general banking questions, get some sample data for context
@@ -624,8 +634,14 @@ Remember: Focus on clarity, readability, and natural conversation flow.`;
       console.log(`📊 Search completed in ${searchTime}ms - Found ${searchResults.length} relevant results`);
       
       // Analyze search results for better context
-      const metadata = this.analyzeSearchResults(searchResults, question);
+      let metadata: any = this.analyzeSearchResults(searchResults, question);
       metadata.totalResults = totalResults;
+      
+      // Merge complex metadata if available
+      if (complexMetadata) {
+        metadata = { ...metadata, ...complexMetadata };
+      }
+      
       console.log(`📈 Search analysis: ${metadata.summary}`);
       
       // Create enhanced context prompt with total count - fix the count display logic
@@ -635,14 +651,17 @@ Remember: Focus on clarity, readability, and natural conversation flow.`;
         const totalInDatabase = await this.getTotalApplicationsCount();
         contextPrompt = this.createContextPrompt(searchResults, metadata) + 
           `\n\nIMPORTANT CONTEXT: Found ${totalResults} matching loan applications out of ${totalInDatabase} total applications in the database. Showing ${searchResults.length} sample results. ALWAYS start your response with "Found ${totalResults} matching loan applications out of ${totalInDatabase} total applications".`;
-      } else if (isCountQuery) {
-        // For count queries: totalResults = total in database
+      } else if (isCountQuery || (metadata && metadata.isCountQuery)) {
+        // For count queries: totalResults = total matching the criteria
+        const totalInDatabase = await this.getTotalApplicationsCount();
+        const matchingCount = totalResults || searchResults.length;
         contextPrompt = this.createContextPrompt(searchResults, metadata) + 
-          `\n\nIMPORTANT CONTEXT: Total applications in database: ${totalResults}. Providing comprehensive statistics. ALWAYS start your response with "Total: ${totalResults} loan applications in the database".`;
+          `\n\nIMPORTANT CONTEXT: Found ${matchingCount} matching loan applications out of ${totalInDatabase} total applications in the database. ALWAYS start your response with "Found ${matchingCount} matching applications out of ${totalInDatabase} total applications".`;
       } else {
         // For regular searches: searchResults.length = matching count
+        const totalInDatabase = await this.getTotalApplicationsCount();
         contextPrompt = this.createContextPrompt(searchResults, metadata) + 
-          `\n\nIMPORTANT CONTEXT: Found ${searchResults.length} matching loan applications. Showing detailed results.`;
+          `\n\nIMPORTANT CONTEXT: Found ${searchResults.length} matching loan applications out of ${totalInDatabase} total applications. Showing detailed results.`;
       }
       
       // Generate AI response with timing
@@ -804,14 +823,14 @@ Remember: Focus on clarity, readability, and natural conversation flow.`;
                   fuzziness: 'AUTO'
                 }
               },
-              // Match individual key terms
-              ...keyTerms.map(term => ({
+              // Match individual key terms  
+              ...(keyTerms.map(term => ({
                 multi_match: {
                   query: term,
                   fields: ['*'],
                   type: 'phrase_prefix'
                 }
-              })),
+              }))),
               // Wildcard searches for customer names
               {
                 bool: {
@@ -852,7 +871,122 @@ Remember: Focus on clarity, readability, and natural conversation flow.`;
       .split(/\s+/)
       .filter(word => word.length > 2 && !stopWords.includes(word));
       
-    return [...new Set(words)]; // Remove duplicates
+    return Array.from(new Set(words)); // Remove duplicates
+  }
+
+  // Enhanced query processing for complex loan questions
+  async processComplexLoanQuery(question: string): Promise<any> {
+    console.log(`🔍 Processing complex loan query: "${question}"`);
+    
+    const lowerQuestion = question.toLowerCase();
+    
+    // Build comprehensive search query based on question analysis
+    let searchQuery: any = { match_all: {} };
+    const filters: any[] = [];
+    
+    // Status filters
+    if (lowerQuestion.includes('approved')) filters.push({ term: { status: 'approved' } });
+    if (lowerQuestion.includes('pending')) filters.push({ term: { status: 'pending' } });
+    if (lowerQuestion.includes('rejected')) filters.push({ term: { status: 'rejected' } });
+    
+    // Loan type filters
+    if (lowerQuestion.includes('business')) filters.push({ term: { loanType: 'business' } });
+    if (lowerQuestion.includes('personal')) filters.push({ term: { loanType: 'personal' } });
+    if (lowerQuestion.includes('mortgage')) filters.push({ term: { loanType: 'mortgage' } });
+    if (lowerQuestion.includes('auto')) filters.push({ term: { loanType: 'auto' } });
+    if (lowerQuestion.includes('student')) filters.push({ term: { loanType: 'student' } });
+    
+    // Risk score filters
+    const riskMatch = question.match(/risk\s+(?:score\s+)?(?:above|over|greater\s+than)\s+(\d+)/i) ||
+                     question.match(/above\s+risk\s+(\d+)/i);
+    if (riskMatch) {
+      const riskScore = parseInt(riskMatch[1]);
+      filters.push({ range: { riskScore: { gte: riskScore } } });
+      console.log(`💯 Risk filter: >= ${riskScore}`);
+    }
+    
+    const riskBelowMatch = question.match(/risk\s+(?:score\s+)?(?:below|under|less\s+than)\s+(\d+)/i) ||
+                          question.match(/below\s+risk\s+(\d+)/i);
+    if (riskBelowMatch) {
+      const riskScore = parseInt(riskBelowMatch[1]);
+      filters.push({ range: { riskScore: { lte: riskScore } } });
+      console.log(`💯 Risk filter: <= ${riskScore}`);
+    }
+    
+    // Amount filters
+    const amountAboveMatch = question.match(/(?:above|over|greater\s+than)\s+\$?([0-9,]+)/i);
+    if (amountAboveMatch) {
+      const amount = parseInt(amountAboveMatch[1].replace(/,/g, ''));
+      filters.push({ range: { amount: { gte: amount } } });
+      console.log(`💰 Amount filter: >= $${amount}`);
+    }
+    
+    const amountBelowMatch = question.match(/(?:below|under|less\s+than)\s+\$?([0-9,]+)/i);
+    if (amountBelowMatch) {
+      const amount = parseInt(amountBelowMatch[1].replace(/,/g, ''));
+      filters.push({ range: { amount: { lte: amount } } });
+      console.log(`💰 Amount filter: <= $${amount}`);
+    }
+    
+    // Credit score filters
+    const creditMatch = question.match(/credit\s+score\s+(?:above|over)\s+(\d+)/i);
+    if (creditMatch) {
+      const creditScore = parseInt(creditMatch[1]);
+      filters.push({ range: { creditScore: { gte: creditScore } } });
+      console.log(`📊 Credit score filter: >= ${creditScore}`);
+    }
+    
+    // Build final query
+    if (filters.length > 0) {
+      searchQuery = {
+        bool: {
+          must: filters
+        }
+      };
+    }
+    
+    // Determine result size based on query type
+    const isCountQuery = lowerQuestion.includes('how many') || lowerQuestion.includes('count') || 
+                        lowerQuestion.includes('total');
+    const resultSize = isCountQuery ? 0 : 50; // Get count only for "how many" questions
+    
+    try {
+      const result = await elasticsearch.search(this.indexName, {
+        query: searchQuery,
+        size: resultSize,
+        sort: [
+          { amount: { order: 'desc' } },
+          { createdAt: { order: 'desc' } }
+        ],
+        aggs: {
+          loan_types: {
+            terms: { field: 'loanType', size: 10 }
+          },
+          statuses: {
+            terms: { field: 'status', size: 10 }
+          },
+          total_amount: {
+            sum: { field: 'amount' }
+          },
+          avg_risk: {
+            avg: { field: 'riskScore' }
+          }
+        }
+      });
+      
+      const totalResults = result.hits.total?.value || result.hits.total || 0;
+      console.log(`🎯 Complex query results: ${totalResults} matching applications`);
+      
+      return {
+        hits: result.hits.hits,
+        total: totalResults,
+        aggregations: result.aggregations,
+        isCountQuery
+      };
+    } catch (error) {
+      console.error('Complex query failed:', error);
+      return { hits: [], total: 0, aggregations: {}, isCountQuery };
+    }
   }
 }
 
