@@ -117,15 +117,19 @@ The system requires several environment variables:
 
 ## Recent Changes (July 22, 2025)
 
-### Enhanced Chatbot Structured Response Format (July 22, 2025)
+### Enhanced Chatbot Query Capabilities (July 22, 2025)
 - ✅ Successfully implemented structured response format showing exact filtered count and top 3 matching documents
 - ✅ Enhanced chatbot logic to provide responses in format: "I found [count] [type] loan applications out of [total] total applications:"
 - ✅ Fixed multi-condition query processing to ensure accurate filtering for complex queries like "approved student loans above 15000"
-- ✅ Added hasMultipleConditions() method to detect queries with status + loan type + amount filters
+- ✅ Added comprehensive field query support for risk scores, application IDs, customer names, and dates
+- ✅ Enhanced risk score filtering with queries like "show me loans with risk score above 70" (231 results)
+- ✅ Added application ID search with format "show me application LA-2025-000001" or "loan 000001"
+- ✅ Implemented customer name search with fuzzy matching for queries like "find customer Benjamin Turner" (18 results)
+- ✅ Added date range filtering support for "after", "before", "since", "until" with date formats
 - ✅ Routes complex multi-condition queries through processComplexLoanQuery() for accurate Elasticsearch filtering
 - ✅ Enhanced response format with proper query description generation based on all conditions
 - ✅ Fixed issue where amount-only queries were returning total count instead of filtered count
-- ✅ System now correctly shows "Found 32 approved student loan above $15000 applications out of 100000 total applications"
+- ✅ System handles all field types: status, loan type, amount, risk score, application ID, customer name, dates
 - ✅ Top 3 documents display with customer names, loan types, amounts, and status for each result
 - ✅ Comprehensive debugging and logging for complex query processing verification
 

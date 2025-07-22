@@ -916,6 +916,34 @@ These are the top 3 results from ${matchingCount} matching applications. Each ap
       parts.push(`risk above ${riskAbove[1]}`);
     }
     
+    const riskBelow = question.match(/risk.*(?:below|under)\s+(\d+)/i);
+    if (riskBelow) {
+      parts.push(`risk below ${riskBelow[1]}`);
+    }
+    
+    // Application ID conditions
+    const applicationId = question.match(/(?:application|loan)\s+(?:id\s+)?(?:LA-)?([0-9-]+)/i);
+    if (applicationId) {
+      parts.push(`application ID ${applicationId[1]}`);
+    }
+    
+    // Customer name conditions
+    const customerName = question.match(/(?:customer|client)\s+(?:name\s+)?"?([A-Za-z]+(?:\s+[A-Za-z]+)?)"?/i);
+    if (customerName) {
+      parts.push(`customer ${customerName[1]}`);
+    }
+    
+    // Date conditions
+    const dateAfter = question.match(/(?:after|since|from)\s+(\d{4}[-\/]\d{1,2}[-\/]\d{1,2}|\d{1,2}[-\/]\d{1,2}[-\/]\d{4})/i);
+    if (dateAfter) {
+      parts.push(`after ${dateAfter[1]}`);
+    }
+    
+    const dateBefore = question.match(/(?:before|until|to)\s+(\d{4}[-\/]\d{1,2}[-\/]\d{1,2}|\d{1,2}[-\/]\d{1,2}[-\/]\d{4})/i);
+    if (dateBefore) {
+      parts.push(`before ${dateBefore[1]}`);
+    }
+    
     const result = parts.join(' ') + ' applications';
     return result;
   }
@@ -946,6 +974,22 @@ These are the top 3 results from ${matchingCount} matching applications. Each ap
     
     // Count risk conditions
     if (lowerQuestion.includes('risk')) {
+      conditionCount++;
+    }
+    
+    // Count application ID conditions
+    if (lowerQuestion.includes('application') && /[0-9-]+/.test(question)) {
+      conditionCount++;
+    }
+    
+    // Count customer name conditions
+    if (lowerQuestion.includes('customer') || lowerQuestion.includes('client')) {
+      conditionCount++;
+    }
+    
+    // Count date conditions
+    if (lowerQuestion.includes('after') || lowerQuestion.includes('before') || 
+        lowerQuestion.includes('since') || lowerQuestion.includes('until')) {
       conditionCount++;
     }
     
@@ -1117,10 +1161,51 @@ These are the top 3 results from ${matchingCount} matching applications. Each ap
     if (lowerQuestion.includes('mortgage')) filters.push({ term: { loanType: 'mortgage' } });
     if (lowerQuestion.includes('auto')) filters.push({ term: { loanType: 'auto' } });
     if (lowerQuestion.includes('student')) filters.push({ term: { loanType: 'student' } });
+
+    // Application ID filters
+    const applicationIdMatch = question.match(/(?:application|loan)\s+(?:id\s+)?(LA-[0-9-]+|[0-9-]+)/i);
+    if (applicationIdMatch) {
+      let appId = applicationIdMatch[1];
+      if (!appId.startsWith('LA-')) {
+        appId = `LA-2025-${appId.padStart(6, '0')}`;
+      }
+      filters.push({ term: { applicationId: appId } });
+      console.log(`🆔 Application ID filter: ${appId}`);
+    }
+
+    // Customer name filters (fuzzy matching)
+    const customerNameMatch = question.match(/(?:customer|client|user|person)\s+(?:name\s+)?"?([A-Za-z]+(?:\s+[A-Za-z]+)?)"?/i);
+    if (customerNameMatch) {
+      const customerName = customerNameMatch[1].trim();
+      filters.push({
+        bool: {
+          should: [
+            { match: { customerName: { query: customerName, fuzziness: "AUTO" } } },
+            { wildcard: { customerName: `*${customerName.toLowerCase()}*` } }
+          ]
+        }
+      });
+      console.log(`👤 Customer name filter: ${customerName}`);
+    }
+
+    // Date filters
+    const dateAfterMatch = question.match(/(?:after|since|from)\s+(\d{4}[-\/]\d{1,2}[-\/]\d{1,2}|\d{1,2}[-\/]\d{1,2}[-\/]\d{4})/i);
+    if (dateAfterMatch) {
+      const dateStr = dateAfterMatch[1];
+      filters.push({ range: { createdAt: { gte: dateStr } } });
+      console.log(`📅 Date after filter: >= ${dateStr}`);
+    }
+
+    const dateBeforeMatch = question.match(/(?:before|until|to)\s+(\d{4}[-\/]\d{1,2}[-\/]\d{1,2}|\d{1,2}[-\/]\d{1,2}[-\/]\d{4})/i);
+    if (dateBeforeMatch) {
+      const dateStr = dateBeforeMatch[1];
+      filters.push({ range: { createdAt: { lte: dateStr } } });
+      console.log(`📅 Date before filter: <= ${dateStr}`);
+    }
     
-    // Risk score filters
+    // Risk score filters (check these before amount filters)
     const riskMatch = question.match(/risk\s+(?:score\s+)?(?:above|over|greater\s+than)\s+(\d+)/i) ||
-                     question.match(/above\s+risk\s+(\d+)/i);
+                     question.match(/above\s+risk\s+(?:score\s+)?(\d+)/i);
     if (riskMatch) {
       const riskScore = parseInt(riskMatch[1]);
       filters.push({ range: { riskScore: { gte: riskScore } } });
@@ -1128,22 +1213,22 @@ These are the top 3 results from ${matchingCount} matching applications. Each ap
     }
     
     const riskBelowMatch = question.match(/risk\s+(?:score\s+)?(?:below|under|less\s+than)\s+(\d+)/i) ||
-                          question.match(/below\s+risk\s+(\d+)/i);
+                          question.match(/below\s+risk\s+(?:score\s+)?(\d+)/i);
     if (riskBelowMatch) {
       const riskScore = parseInt(riskBelowMatch[1]);
       filters.push({ range: { riskScore: { lte: riskScore } } });
       console.log(`💯 Risk filter: <= ${riskScore}`);
     }
     
-    // Amount filters
-    const amountAboveMatch = question.match(/(?:above|over|greater\s+than)\s+\$?([0-9,]+)/i);
+    // Amount filters (only if not a risk query)
+    const amountAboveMatch = !riskMatch && question.match(/(?:above|over|greater\s+than)\s+\$?([0-9,]+)/i);
     if (amountAboveMatch) {
       const amount = parseInt(amountAboveMatch[1].replace(/,/g, ''));
       filters.push({ range: { amount: { gte: amount } } });
       console.log(`💰 Amount filter: >= $${amount}`);
     }
     
-    const amountBelowMatch = question.match(/(?:below|under|less\s+than)\s+\$?([0-9,]+)/i);
+    const amountBelowMatch = !riskBelowMatch && question.match(/(?:below|under|less\s+than)\s+\$?([0-9,]+)/i);
     if (amountBelowMatch) {
       const amount = parseInt(amountBelowMatch[1].replace(/,/g, ''));
       filters.push({ range: { amount: { lte: amount } } });
