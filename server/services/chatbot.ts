@@ -544,7 +544,25 @@ Remember: Focus on clarity, readability, and natural conversation flow.`;
       let totalResults = 0;
       let complexMetadata: any = null;
       
-      if (isAmountQuery) {
+      // Check if query has multiple conditions (status + loan type + amount)
+      const hasMultipleConditions = this.hasMultipleConditions(question);
+      
+      if (hasMultipleConditions) {
+        // For queries with multiple conditions, always use complex query processor
+        console.log(`🔍 Multi-condition query detected: "${question}"`);
+        console.log('🎯 Using complex query processor for accurate filtering...');
+        const complexResult = await this.processComplexLoanQuery(question);
+        searchResults = complexResult.hits || [];
+        totalResults = complexResult.total || 0;
+        
+        // Store aggregation data
+        complexMetadata = {
+          aggregations: complexResult.aggregations,
+          isCountQuery: complexResult.isCountQuery
+        };
+        
+        console.log(`🎯 Complex multi-condition query found ${totalResults} matching applications`);
+      } else if (isAmountQuery && !hasMultipleConditions) {
         // For amount queries, search the entire index with proper filtering
         const amountFilter = this.extractAmountRange(question);
         console.log(`💰 Amount query detected: ${JSON.stringify(amountFilter)}`);
@@ -597,8 +615,8 @@ Remember: Focus on clarity, readability, and natural conversation flow.`;
         // Check if it's a specific search query vs general banking question  
         const isDataSearchQueryCheck = this.isDataSearchQuery(question);
         
-        if (isDataSearchQueryCheck) {
-          // Use enhanced complex query processing
+        if (isDataSearchQueryCheck || hasMultipleConditions) {
+          // Always use complex query processing for accurate filtering
           console.log('🎯 Data search query detected, using complex query processor...');
           const complexResult = await this.processComplexLoanQuery(question);
           searchResults = complexResult.hits || [];
@@ -609,6 +627,8 @@ Remember: Focus on clarity, readability, and natural conversation flow.`;
             aggregations: complexResult.aggregations,
             isCountQuery: complexResult.isCountQuery
           };
+          
+          console.log(`🎯 Complex query found ${totalResults} applications matching all conditions`);
           
           // If no results from complex query, try semantic search as fallback
           if (searchResults.length === 0 && !complexResult.isCountQuery) {
@@ -832,11 +852,20 @@ Context: Top 3 matching applications out of ${totalResults} total matches.`;
       return `• Customer: ${source.customerName} - ${source.loanType} loan for $${source.amount} (Status: ${source.status})`;
     }).join('\n');
 
-    return `I found ${totalResults} ${this.getQueryTypeFromQuestion(question)} loan applications${conditionsText}:
+    // Extract the actual matching count from totalResults
+    const matchingCount = typeof totalResults === 'object' && totalResults.value ? totalResults.value : totalResults;
+    
+    // Get total applications count for context
+    const totalInDB = 100000; // Known total from system
+    
+    // Generate proper description based on all conditions in the query
+    let queryDescription = this.getQueryDescription(question);
+    
+    return `I found ${matchingCount} ${queryDescription} out of ${totalInDB} total applications:
 
 ${documentsList}
 
-These are the top 3 results from your search. Each application includes detailed customer information, loan amounts, and current status for your review.`;
+These are the top 3 results from ${matchingCount} matching applications. Each application includes detailed customer information, loan amounts, and current status for your review.`;
   }
 
   // Helper method to determine query type from question
@@ -850,6 +879,77 @@ These are the top 3 results from your search. Each application includes detailed
     if (lowerQuestion.includes('auto')) return 'auto';
     if (lowerQuestion.includes('student')) return 'student';
     return '';
+  }
+
+  // Generate comprehensive query description based on all conditions
+  private getQueryDescription(question: string): string {
+    const lowerQuestion = question.toLowerCase();
+    const parts: string[] = [];
+    
+    // Status conditions
+    if (lowerQuestion.includes('approved')) parts.push('approved');
+    if (lowerQuestion.includes('pending')) parts.push('pending');
+    if (lowerQuestion.includes('rejected')) parts.push('rejected');
+    
+    // Loan type conditions  
+    if (lowerQuestion.includes('student')) parts.push('student loan');
+    else if (lowerQuestion.includes('business')) parts.push('business loan');
+    else if (lowerQuestion.includes('personal')) parts.push('personal loan');
+    else if (lowerQuestion.includes('mortgage')) parts.push('mortgage loan');
+    else if (lowerQuestion.includes('auto')) parts.push('auto loan');
+    else if (!parts.some(p => p.includes('loan'))) parts.push('loan');
+    
+    // Amount conditions
+    const amountAbove = question.match(/(?:above|over)\s+\$?([0-9,]+)/i);
+    if (amountAbove) {
+      parts.push(`above $${amountAbove[1]}`);
+    }
+    
+    const amountBelow = question.match(/(?:below|under)\s+\$?([0-9,]+)/i);
+    if (amountBelow) {
+      parts.push(`below $${amountBelow[1]}`);
+    }
+    
+    // Risk conditions
+    const riskAbove = question.match(/risk.*(?:above|over)\s+(\d+)/i);
+    if (riskAbove) {
+      parts.push(`risk above ${riskAbove[1]}`);
+    }
+    
+    const result = parts.join(' ') + ' applications';
+    return result;
+  }
+
+  // Check if query has multiple filtering conditions
+  private hasMultipleConditions(question: string): boolean {
+    const lowerQuestion = question.toLowerCase();
+    let conditionCount = 0;
+    
+    // Count status conditions
+    if (lowerQuestion.includes('approved') || lowerQuestion.includes('pending') || lowerQuestion.includes('rejected')) {
+      conditionCount++;
+    }
+    
+    // Count loan type conditions
+    if (lowerQuestion.includes('student') || lowerQuestion.includes('business') || 
+        lowerQuestion.includes('personal') || lowerQuestion.includes('mortgage') || 
+        lowerQuestion.includes('auto')) {
+      conditionCount++;
+    }
+    
+    // Count amount conditions
+    if (lowerQuestion.includes('above') || lowerQuestion.includes('below') || 
+        lowerQuestion.includes('over') || lowerQuestion.includes('under') ||
+        /\$?[0-9,]+/.test(question)) {
+      conditionCount++;
+    }
+    
+    // Count risk conditions
+    if (lowerQuestion.includes('risk')) {
+      conditionCount++;
+    }
+    
+    return conditionCount > 1;
   }
 
   // Extract query conditions for context

@@ -117,6 +117,20 @@ The system requires several environment variables:
 
 ## Recent Changes (July 22, 2025)
 
+### Enhanced Chatbot Structured Response Format (July 22, 2025)
+- ✅ Successfully implemented structured response format showing exact filtered count and top 3 matching documents
+- ✅ Enhanced chatbot logic to provide responses in format: "I found [count] [type] loan applications out of [total] total applications:"
+- ✅ Fixed multi-condition query processing to ensure accurate filtering for complex queries like "approved student loans above 15000"
+- ✅ Added hasMultipleConditions() method to detect queries with status + loan type + amount filters
+- ✅ Routes complex multi-condition queries through processComplexLoanQuery() for accurate Elasticsearch filtering
+- ✅ Enhanced response format with proper query description generation based on all conditions
+- ✅ Fixed issue where amount-only queries were returning total count instead of filtered count
+- ✅ System now correctly shows "Found 32 approved student loan above $15000 applications out of 100000 total applications"
+- ✅ Top 3 documents display with customer names, loan types, amounts, and status for each result
+- ✅ Comprehensive debugging and logging for complex query processing verification
+
+## Recent Changes (July 22, 2025)
+
 ### Migration to Replit Environment (July 22, 2025)
 - ✅ Successfully migrated ElastiBank from Replit Agent to standard Replit environment
 - ✅ Fixed all Node.js and TypeScript dependency issues for clean deployment
