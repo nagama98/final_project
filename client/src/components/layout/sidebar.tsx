@@ -17,7 +17,7 @@ export default function Sidebar() {
         { name: "Dashboard", icon: BarChart3, href: "/dashboard" },
         { name: "Applications", icon: FileText, href: "/applications" },
         { name: "Customers", icon: Users, href: "/customers" },
-        { name: "Documents", icon: FolderOpen, href: "/documents" },
+        { name: "Image Comparison", icon: FolderOpen, href: "http://20.41.255.214:9200/" },
         { name: "AI Assistant", icon: MessageCircle, href: "/chatbot" },
       ]
     }

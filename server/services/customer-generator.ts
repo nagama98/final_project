@@ -199,7 +199,7 @@ export class CustomerGeneratorService {
     }
   }
 
-  async generateLoanApplicationsForCustomers(customers: any[], loansPerCustomer: number = 1000): Promise<void> {
+  async generateLoanApplicationsForCustomers(customers: any[], loansPerCustomer: number = 100): Promise<void> {
     console.log(`💰 Starting generation of ${loansPerCustomer} loan applications for each of ${customers.length} customers...`);
     
     const loanTypes = ['personal', 'mortgage', 'auto', 'business', 'student'];
@@ -348,7 +348,7 @@ export class CustomerGeneratorService {
       default: baseRate = 10;
     }
     
-    // Adjust based on credit score
+    //Adjust based on credit score
     const adjustment = creditScore > 750 ? -2 : creditScore > 650 ? -1 : creditScore < 600 ? 3 : 0;
     const finalRate = Math.max(baseRate + adjustment + (Math.random() * 2 - 1), 2);
     
@@ -358,7 +358,7 @@ export class CustomerGeneratorService {
   private generateLoanDescription(loanData: any): string {
     const {
       applicationId, customerName, customerId, loanType, amount, term, status, 
-      riskScore, purpose, income, creditScore, collateral, interestRate
+      riskScore, purpose, creditScore, collateral, interestRate
     } = loanData;
 
     // Generate risk level based on score
@@ -373,7 +373,7 @@ Loan Application ${applicationId}: ${loanType.charAt(0).toUpperCase() + loanType
 Amount requested: $${formattedAmount} over ${term} ${term === 1 ? 'month' : term > 12 ? Math.floor(term/12) + ' years' : 'months'}. 
 Current status: ${status.replace('_', ' ')}. 
 Purpose: ${purpose}. 
-Customer profile: Annual income $${income.toLocaleString()}, credit score ${creditScore}, ${collateral === 'Yes' ? 'secured with collateral' : 'unsecured loan'}. 
+Customer profile: credit score ${creditScore}, ${collateral === 'Yes' ? 'secured with collateral' : 'unsecured loan'}. 
 Risk assessment: ${riskLevel} risk (score: ${riskScore}/100). 
 Interest rate: ${interestRate}% APR. 
 Application details: ${status === 'approved' ? 'Approved for disbursement' : status === 'rejected' ? 'Rejected due to risk factors' : status === 'disbursed' ? 'Funds successfully disbursed' : status === 'under_review' ? 'Currently under review by loan officers' : 'Pending initial review'}. 
@@ -382,6 +382,7 @@ Loan type specifics: ${this.getLoanTypeDetails(loanType, amount, term, purpose)}
 
     return description;
   }
+  
 
   private getLoanTypeDetails(loanType: string, amount: string, term: number, purpose: string): string {
     const amountNum = parseInt(amount);
