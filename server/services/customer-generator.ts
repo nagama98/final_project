@@ -508,20 +508,23 @@ Loan type specifics: ${this.getLoanTypeDetails(loanType, amount, term, purpose)}
     const totalLoanCount = customerCount * loansPerCustomer;
     console.log(`🚀 Starting generation of ${customerCount} customers with ${loansPerCustomer} loans each (${totalLoanCount} total applications)...`);
     
-    // Check if data already exists
+    // Check if indices exist and have expected data
     const customersExist = await this.checkIndexExists('customers');
     const applicationsExist = await this.checkIndexExists('loan_applications');
     
     if (customersExist && applicationsExist) {
       // Get existing counts
       try {
-        const existingCustomers = await elasticsearch.getAllDocuments('customers', 10000);
-        const existingApplications = await elasticsearch.getAllDocuments('loan_applications', 10000);
+        const existingCustomers = await elasticsearch.getAllDocuments('customers', 1000);
+        const existingApplications = await elasticsearch.getAllDocuments('loan_applications', 20000);
         
         if (existingCustomers.length >= customerCount && existingApplications.length >= totalLoanCount) {
-          console.log(`✅ Data already exists: ${existingCustomers.length} customers, ${existingApplications.length} applications`);
+          console.log(`✅ Data already exists: ${existingCustomers.length} customers, ${existingApplications.length} applications. Skipping generation.`);
           return;
         }
+        
+        console.log(`📊 Current data: ${existingCustomers.length}/${customerCount} customers, ${existingApplications.length}/${totalLoanCount} applications`);
+        console.log('🔄 Insufficient data found, proceeding with generation...');
       } catch (error) {
         console.log('Error checking existing data, proceeding with generation...');
       }

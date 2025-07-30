@@ -58,13 +58,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         applications = await elasticsearchStorage.getAllLoanApplications();
       }
 
-      if (applications.length < 100) {
-        console.log('Generating initial customer and loan application data...');
+      // Check if we have the expected amount of data
+      const expectedCustomers = 100;
+      const expectedApplications = 10000; // 100 customers × 100 applications each
+      
+      const customers = await elasticsearchStorage.getAllCustomers();
+      
+      if (applications.length < expectedApplications || customers.length < expectedCustomers) {
+        console.log(`Generating initial data: found ${customers.length}/${expectedCustomers} customers and ${applications.length}/${expectedApplications} applications`);
         // Generate 100 customers with 100 loan applications each
         await customerGenerator.generateCustomersAndLoans(100, 100);
         console.log('Initial data generation completed');
       } else {
-        console.log(`Found ${applications.length} existing applications, skipping data generation`);
+        console.log(`✅ Data already exists: ${customers.length} customers and ${applications.length} applications, skipping generation`);
       }
     } catch (error) {
       console.error('Failed to generate initial data:', error);
