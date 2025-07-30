@@ -480,29 +480,7 @@ Loan type specifics: ${this.getLoanTypeDetails(loanType, amount, term, purpose)}
     }
   }
 
-  async clearExistingData(): Promise<void> {
-    console.log('🧹 Clearing existing data...');
-    try {
-      // Check if indices exist before deleting
-      const customersExist = await this.checkIndexExists('customers');
-      const applicationsExist = await this.checkIndexExists('loan_applications');
-      
-      if (customersExist) {
-        await elasticsearch.deleteIndex('customers');
-        console.log('Deleted existing customers index');
-      }
-      
-      if (applicationsExist) {
-        await elasticsearch.deleteIndex('loan_applications');
-        console.log('Deleted existing loan_applications index');
-      }
-      
-      await elasticsearch.initializeIndices();
-      console.log('✅ Existing data cleared successfully!');
-    } catch (error) {
-      console.error('Failed to clear existing data:', error);
-    }
-  }
+
 
   async generateCustomersAndLoans(customerCount: number = 100, loansPerCustomer: number = 100): Promise<void> {
     const totalLoanCount = customerCount * loansPerCustomer;
@@ -530,15 +508,39 @@ Loan type specifics: ${this.getLoanTypeDetails(loanType, amount, term, purpose)}
       }
     }
     
-    // Clear existing data
-    await this.clearExistingData();
+    // Initialize indices if they don't exist (without clearing)
+    await elasticsearch.initializeIndices();
     
-    // Generate customers first
-    const customers = await this.generateCustomers(customerCount);
-    console.log(`✅ Generated ${customers.length} customers`);
+    // Generate customers only if we don't have enough
+    let customers: any[] = [];
     
-    // Generate loan applications for each customer
-    await this.generateLoanApplicationsForCustomers(customers, loansPerCustomer);
+    if (customersExist) {
+      customers = await elasticsearch.getAllDocuments('customers', 1000);
+    }
+    
+    if (customers.length < customerCount) {
+      const newCustomers = await this.generateCustomers(customerCount - customers.length);
+      customers = [...customers, ...newCustomers];
+      console.log(`✅ Generated ${newCustomers.length} new customers (total: ${customers.length})`);
+    } else {
+      console.log(`✅ Using existing ${customers.length} customers`);
+    }
+    
+    // Generate loan applications only if we don't have enough
+    let existingApplicationsCount = 0;
+    if (applicationsExist) {
+      const existingApps = await elasticsearch.getAllDocuments('loan_applications', 20000);
+      existingApplicationsCount = existingApps.length;
+    }
+    
+    if (existingApplicationsCount < totalLoanCount) {
+      const neededApplications = totalLoanCount - existingApplicationsCount;
+      const applicationsPerCustomer = Math.ceil(neededApplications / customers.length);
+      await this.generateLoanApplicationsForCustomers(customers, applicationsPerCustomer);
+      console.log(`✅ Generated ${neededApplications} new loan applications`);
+    } else {
+      console.log(`✅ Using existing ${existingApplicationsCount} loan applications`);
+    }
     
     console.log(`🎉 Successfully generated ${customerCount} customers and ${totalLoanCount} loan applications with proper correlation!`);
   }

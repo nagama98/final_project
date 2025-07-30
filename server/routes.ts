@@ -102,11 +102,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Generate new data endpoint
+  // Generate new data endpoint (incremental generation only)
   app.post("/api/generate-data", async (req, res) => {
     try {
       const { customers = 100, loansPerCustomer = 100 } = req.body;
-      console.log(`Generating ${customers} customers with ${loansPerCustomer} loans each...`);
+      console.log(`Generating ${customers} customers with ${loansPerCustomer} loans each (incremental)...`);
       
       await customerGenerator.generateCustomersAndLoans(customers, loansPerCustomer);
       
