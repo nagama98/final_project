@@ -189,7 +189,8 @@ export class ElasticsearchStorage {
 
   async getAllLoanApplications(): Promise<LoanApplication[]> {
     try {
-      return await elasticsearch.getAllDocuments('loan_applications', 10000);
+      // Get all documents without size limit to query entire dataset
+      return await elasticsearch.getAllDocuments('loan_applications', 20000);
     } catch (error) {
       console.error('Failed to get all loan applications:', error);
       return [];
@@ -199,7 +200,8 @@ export class ElasticsearchStorage {
   // Customer methods
   async getAllCustomers(): Promise<any[]> {
     try {
-      return await elasticsearch.getAllDocuments('customers', 10000);
+      // Get all customers without size limit
+      return await elasticsearch.getAllDocuments('customers', 1000);
     } catch (error) {
       console.error('Failed to get all customers:', error);
       return [];

@@ -35,7 +35,7 @@ interface ApplicationsTableProps {
 export default function ApplicationsTable({ filters }: ApplicationsTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20; // Show 20 items per page
-  const maxTotalItems = 100; // Limit to 100 records total
+  // Remove 100 record limit - query entire dataset as requested
 
   const { data: applications, isLoading } = useQuery<LoanApplication[]>({
     queryKey: ['/api/applications'],
@@ -43,9 +43,9 @@ export default function ApplicationsTable({ filters }: ApplicationsTableProps) {
 
   const filteredApplications = useMemo(() => {
     if (!applications) return [];
-    if (!filters) return applications.slice(0, maxTotalItems);
+    if (!filters) return applications; // Return all applications without limit
     
-    return applications.slice(0, maxTotalItems).filter(app => {
+    return applications.filter(app => {
       // Filter by search query
       if (filters.searchQuery && filters.searchQuery.trim() !== '') {
         const query = filters.searchQuery.toLowerCase();
@@ -304,9 +304,6 @@ export default function ApplicationsTable({ filters }: ApplicationsTableProps) {
         <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
           <div className="text-sm text-gray-500">
             Showing {startIndex + 1} to {Math.min(endIndex, filteredApplications.length)} of {filteredApplications.length} applications
-            {filteredApplications.length >= maxTotalItems && (
-              <span className="text-blue-600 ml-1">(Limited to {maxTotalItems} records)</span>
-            )}
           </div>
           <div className="flex items-center space-x-2">
             <Button 

@@ -89,8 +89,13 @@ export class ElasticsearchService {
     }
   }
 
-  async getAllDocuments(indexName: string, size: number = 100): Promise<any[]> {
+  async getAllDocuments(indexName: string, size: number = 10000): Promise<any[]> {
     try {
+      // Use scroll API for large datasets
+      if (size > 10000) {
+        return await this.scrollAllDocuments(indexName);
+      }
+      
       const response = await this.client.search({
         index: indexName,
         query: { match_all: {} },
@@ -102,6 +107,54 @@ export class ElasticsearchService {
       }));
     } catch (error) {
       console.error(`Failed to get all documents:`, error);
+      return [];
+    }
+  }
+
+  async scrollAllDocuments(indexName: string): Promise<any[]> {
+    try {
+      const allDocuments: any[] = [];
+      const scrollSize = 1000;
+      
+      // Initial search
+      let response = await this.client.search({
+        index: indexName,
+        query: { match_all: {} },
+        size: scrollSize,
+        scroll: '1m'
+      });
+
+      // Process first batch
+      allDocuments.push(...response.hits.hits.map((hit: any) => ({
+        id: hit._id,
+        ...hit._source
+      })));
+
+      // Continue scrolling while there are more results
+      while (response.hits.hits.length > 0) {
+        response = await this.client.scroll({
+          scroll_id: response._scroll_id,
+          scroll: '1m'
+        });
+
+        if (response.hits.hits.length === 0) break;
+
+        allDocuments.push(...response.hits.hits.map((hit: any) => ({
+          id: hit._id,
+          ...hit._source
+        })));
+      }
+
+      // Clear scroll context
+      if (response._scroll_id) {
+        await this.client.clearScroll({
+          scroll_id: response._scroll_id
+        });
+      }
+
+      return allDocuments;
+    } catch (error) {
+      console.error(`Failed to scroll all documents:`, error);
       return [];
     }
   }
