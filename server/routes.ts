@@ -60,8 +60,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (applications.length < 100) {
         console.log('Generating initial customer and loan application data...');
-        // Generate 100 customers with 1 loan application each
-        await customerGenerator.generateCustomersAndLoans(100, 1);
+        // Generate 100 customers with 100 loan applications each
+        await customerGenerator.generateCustomersAndLoans(100, 100);
         console.log('Initial data generation completed');
       } else {
         console.log(`Found ${applications.length} existing applications, skipping data generation`);
@@ -99,7 +99,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Generate new data endpoint
   app.post("/api/generate-data", async (req, res) => {
     try {
-      const { customers = 100, loansPerCustomer = 1 } = req.body;
+      const { customers = 100, loansPerCustomer = 100 } = req.body;
       console.log(`Generating ${customers} customers with ${loansPerCustomer} loans each...`);
       
       await customerGenerator.generateCustomersAndLoans(customers, loansPerCustomer);

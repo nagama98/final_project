@@ -111,7 +111,7 @@ export class CustomerGeneratorService {
       totalLoans: 0,
       totalAmount: 0,
       activeLoans: 0,
-      createdAt: this.generateRandomDateInRange('2024-01-01', '2025-07-30').toISOString(),
+      createdAt: this.generateRandomDateInRange('2023-01-01', '2025-07-30').toISOString(),
       updatedAt: new Date().toISOString()
     };
 
@@ -207,7 +207,7 @@ export class CustomerGeneratorService {
     }
   }
 
-  async generateLoanApplicationsForCustomers(customers: any[], loansPerCustomer: number = 1): Promise<void> {
+  async generateLoanApplicationsForCustomers(customers: any[], loansPerCustomer: number = 100): Promise<void> {
     console.log(`💰 Starting generation of ${loansPerCustomer} loan applications for each of ${customers.length} customers...`);
     
     const loanTypes = ['personal', 'mortgage', 'auto', 'business', 'student'];
@@ -275,7 +275,7 @@ export class CustomerGeneratorService {
             collateral,
             interestRate
           }),
-          createdAt: this.generateRandomDateInRange('2024-01-01', '2025-07-30').toISOString(),
+          createdAt: this.generateRandomDateInRange('2023-01-01', '2025-07-30').toISOString(),
           updatedAt: new Date().toISOString()
         };
         
@@ -504,7 +504,7 @@ Loan type specifics: ${this.getLoanTypeDetails(loanType, amount, term, purpose)}
     }
   }
 
-  async generateCustomersAndLoans(customerCount: number = 100, loansPerCustomer: number = 1): Promise<void> {
+  async generateCustomersAndLoans(customerCount: number = 100, loansPerCustomer: number = 100): Promise<void> {
     const totalLoanCount = customerCount * loansPerCustomer;
     console.log(`🚀 Starting generation of ${customerCount} customers with ${loansPerCustomer} loans each (${totalLoanCount} total applications)...`);
     
