@@ -66,6 +66,14 @@ export class CustomerGeneratorService {
     return array[Math.floor(Math.random() * array.length)];
   }
 
+  private generateRandomDateInRange(startDate: string, endDate: string): Date {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const timeRange = end.getTime() - start.getTime();
+    const randomTime = Math.random() * timeRange;
+    return new Date(start.getTime() + randomTime);
+  }
+
   private generateUniqueCustomerId(): string {
     const timestamp = Date.now().toString(36);
     const random = Math.random().toString(36).substr(2, 5);
@@ -103,7 +111,7 @@ export class CustomerGeneratorService {
       totalLoans: 0,
       totalAmount: 0,
       activeLoans: 0,
-      createdAt: new Date().toISOString(),
+      createdAt: this.generateRandomDateInRange('2024-01-01', '2025-07-30').toISOString(),
       updatedAt: new Date().toISOString()
     };
 
@@ -152,7 +160,7 @@ export class CustomerGeneratorService {
           console.log('Failed to generate customers, skipping loan correlation update');
           return;
         }
-        customers = newCustomers;
+        customers.splice(0, customers.length, ...newCustomers);
         console.log(`Now found ${customers.length} customers after generation`);
       }
 
@@ -199,7 +207,7 @@ export class CustomerGeneratorService {
     }
   }
 
-  async generateLoanApplicationsForCustomers(customers: any[], loansPerCustomer: number = 100): Promise<void> {
+  async generateLoanApplicationsForCustomers(customers: any[], loansPerCustomer: number = 1): Promise<void> {
     console.log(`💰 Starting generation of ${loansPerCustomer} loan applications for each of ${customers.length} customers...`);
     
     const loanTypes = ['personal', 'mortgage', 'auto', 'business', 'student'];
@@ -267,7 +275,7 @@ export class CustomerGeneratorService {
             collateral,
             interestRate
           }),
-          createdAt: this.generateRandomDate(365).toISOString(),
+          createdAt: this.generateRandomDateInRange('2024-01-01', '2025-07-30').toISOString(),
           updatedAt: new Date().toISOString()
         };
         
@@ -430,8 +438,8 @@ Loan type specifics: ${this.getLoanTypeDetails(loanType, amount, term, purpose)}
         
         // Calculate stats
         const totalLoans = loans.length;
-        const totalAmount = loans.reduce((sum, loan) => sum + parseFloat(loan.amount || 0), 0);
-        const activeLoans = loans.filter(loan => 
+        const totalAmount = loans.reduce((sum: number, loan: any) => sum + parseFloat(loan.amount || 0), 0);
+        const activeLoans = loans.filter((loan: any) => 
           loan.status === 'approved' || loan.status === 'disbursed'
         ).length;
 
@@ -460,11 +468,35 @@ Loan type specifics: ${this.getLoanTypeDetails(loanType, amount, term, purpose)}
     }
   }
 
+  async checkIndexExists(indexName: string): Promise<boolean> {
+    try {
+      const response = await elasticsearch.search(indexName, {
+        query: { match_all: {} },
+        size: 1
+      });
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
   async clearExistingData(): Promise<void> {
     console.log('🧹 Clearing existing data...');
     try {
-      await elasticsearch.deleteIndex('customers');
-      await elasticsearch.deleteIndex('loan_applications');
+      // Check if indices exist before deleting
+      const customersExist = await this.checkIndexExists('customers');
+      const applicationsExist = await this.checkIndexExists('loan_applications');
+      
+      if (customersExist) {
+        await elasticsearch.deleteIndex('customers');
+        console.log('Deleted existing customers index');
+      }
+      
+      if (applicationsExist) {
+        await elasticsearch.deleteIndex('loan_applications');
+        console.log('Deleted existing loan_applications index');
+      }
+      
       await elasticsearch.initializeIndices();
       console.log('✅ Existing data cleared successfully!');
     } catch (error) {
@@ -472,9 +504,28 @@ Loan type specifics: ${this.getLoanTypeDetails(loanType, amount, term, purpose)}
     }
   }
 
-  async generateCustomersAndLoans(customerCount: number = 100, loansPerCustomer: number = 1000): Promise<void> {
+  async generateCustomersAndLoans(customerCount: number = 100, loansPerCustomer: number = 1): Promise<void> {
     const totalLoanCount = customerCount * loansPerCustomer;
     console.log(`🚀 Starting generation of ${customerCount} customers with ${loansPerCustomer} loans each (${totalLoanCount} total applications)...`);
+    
+    // Check if data already exists
+    const customersExist = await this.checkIndexExists('customers');
+    const applicationsExist = await this.checkIndexExists('loan_applications');
+    
+    if (customersExist && applicationsExist) {
+      // Get existing counts
+      try {
+        const existingCustomers = await elasticsearch.getAllDocuments('customers', 10000);
+        const existingApplications = await elasticsearch.getAllDocuments('loan_applications', 10000);
+        
+        if (existingCustomers.length >= customerCount && existingApplications.length >= totalLoanCount) {
+          console.log(`✅ Data already exists: ${existingCustomers.length} customers, ${existingApplications.length} applications`);
+          return;
+        }
+      } catch (error) {
+        console.log('Error checking existing data, proceeding with generation...');
+      }
+    }
     
     // Clear existing data
     await this.clearExistingData();

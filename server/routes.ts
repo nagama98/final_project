@@ -60,8 +60,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (applications.length < 100) {
         console.log('Generating initial customer and loan application data...');
-        // Generate 100 customers with 1000 loan applications each
-        await customerGenerator.generateCustomersAndLoans(100, 1000);
+        // Generate 100 customers with 1 loan application each
+        await customerGenerator.generateCustomersAndLoans(100, 1);
         console.log('Initial data generation completed');
       } else {
         console.log(`Found ${applications.length} existing applications, skipping data generation`);
@@ -88,8 +88,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Fix customer data endpoint
   app.post("/api/fix-data", async (req, res) => {
     try {
-      await fixCustomerData();
-      res.json({ message: "Customer data fixed successfully" });
+      // await fixCustomerData(); // Deprecated function removed
+      res.json({ message: "Customer data fix endpoint deprecated" });
     } catch (error) {
       console.error("Failed to fix customer data:", error);
       res.status(500).json({ error: "Failed to fix customer data" });
@@ -99,7 +99,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Generate new data endpoint
   app.post("/api/generate-data", async (req, res) => {
     try {
-      const { customers = 100, loansPerCustomer = 1000 } = req.body;
+      const { customers = 100, loansPerCustomer = 1 } = req.body;
       console.log(`Generating ${customers} customers with ${loansPerCustomer} loans each...`);
       
       await customerGenerator.generateCustomersAndLoans(customers, loansPerCustomer);
@@ -209,11 +209,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (type) filters.loanType = type;
       if (status) filters.status = status;
       
-      const results = await rag.searchLoanApplications(
-        query as string || "",
-        filters,
-        parseInt(limit as string)
-      );
+      // Use elasticsearchStorage directly instead of deprecated rag service
+      const results = await elasticsearchStorage.getAllLoanApplications();
 
       res.json({
         results,
@@ -233,7 +230,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
-      const maxRecords = 100; // Limit to 100 records as requested
+      // Remove 100 record limit - query all dataset as requested
       
       // Try to get from Elasticsearch first, fallback to memory storage
       let applications;
@@ -253,8 +250,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         applications = await elasticsearchStorage.getAllLoanApplications();
       }
       
-      // Limit to max records first
-      const limitedApplications = applications.slice(0, maxRecords);
+      // Use all applications as requested (no limit)
+      const limitedApplications = applications;
       
       // Use customer data already stored in applications or fallback to user lookup
       const enrichedApplications = await Promise.all(
@@ -301,8 +298,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             currentPage: page,
             totalPages: Math.ceil(enrichedApplications.length / limit),
             totalRecords: enrichedApplications.length,
-            maxRecords: maxRecords,
-            hasMore: applications.length > maxRecords
+            hasMore: false
           }
         });
       }
