@@ -122,54 +122,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Recreate index with semantic_text mapping
-  app.post("/api/recreate-index", async (req, res) => {
-    try {
-      console.log('🔄 Recreating loan_applications index with semantic_text mapping...');
-      
-      // Recreate the loan_applications index with semantic_text mapping
-      await elasticsearch.recreateIndex('loan_applications', {
-        properties: {
-          id: { type: 'integer' },
-          applicationId: { type: 'keyword' },
-          customerId: { type: 'keyword' },
-          custId: { type: 'keyword' },
-          customerName: { type: 'text' },
-          customerEmail: { type: 'keyword' },
-          loanType: { type: 'keyword' },
-          amount: { type: 'text' },
-          term: { type: 'integer' },
-          status: { type: 'keyword' },
-          interestRate: { type: 'text' },
-          riskScore: { type: 'integer' },
-          purpose: { type: 'text' },
-          income: { type: 'text' },
-          creditScore: { type: 'integer' },
-          collateral: { type: 'keyword' },
-          description: {
-            type: 'semantic_text'
-          },
-          documents: { type: 'text' },
-          notes: { type: 'text' },
-          createdAt: { type: 'date' },
-          updatedAt: { type: 'date' },
-          embedding: {
-            type: 'dense_vector',
-            dims: 1536 // OpenAI embedding dimension
-          }
-        }
-      });
-      
-      res.json({
-        message: "Successfully recreated loan_applications index with semantic_text mapping",
-        indexName: "loan_applications",
-        mappingType: "semantic_text"
-      });
-    } catch (error) {
-      console.error('Index recreation failed:', error);
-      res.status(500).json({ error: "Failed to recreate index" });
-    }
-  });
+  // Removed recreate-index endpoint - no longer clearing/recreating indices
 
   // Dashboard metrics
   app.get("/api/dashboard/metrics", async (req, res) => {

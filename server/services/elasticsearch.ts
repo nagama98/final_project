@@ -38,29 +38,7 @@ export class ElasticsearchService {
     }
   }
 
-  async deleteIndex(indexName: string): Promise<void> {
-    try {
-      const exists = await this.client.indices.exists({ index: indexName });
-      if (exists) {
-        await this.client.indices.delete({ index: indexName });
-        console.log(`Successfully deleted index ${indexName}`);
-      }
-    } catch (error) {
-      console.error(`Failed to delete index ${indexName}:`, error);
-      throw error;
-    }
-  }
-
-  async recreateIndex(indexName: string, mapping: any): Promise<void> {
-    try {
-      await this.deleteIndex(indexName);
-      await this.createIndex(indexName, mapping);
-      console.log(`Successfully recreated index ${indexName} with new mapping`);
-    } catch (error) {
-      console.error(`Failed to recreate index ${indexName}:`, error);
-      throw error;
-    }
-  }
+  // Removed deleteIndex and recreateIndex methods - no longer clearing indices
 
   async indexDocument(indexName: string, id: string, document: any): Promise<void> {
     try {
